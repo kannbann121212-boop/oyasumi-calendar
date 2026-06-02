@@ -1,23 +1,22 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<link rel="icon" type="image/png" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>お休みカレンダー</title>
+<title>📅 休日カレンダー</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: -apple-system, 'Helvetica Neue', sans-serif;
-  background: #f0f4f8;
+  background: linear-gradient(180deg, #dfeafb 0%, #f7fbff 100%);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 20px 12px 40px;
 }
-h1 { color: #2E75B6; font-size: 21px; letter-spacing: 2px; margin-bottom: 4px; }
+h1 { color: #135fbd; font-size: 30px; letter-spacing: 2px; margin: 18px 0 18px; font-weight: 800; text-shadow: 0 2px 0 rgba(255,255,255,0.9); }
 .subtitle {
   color: #555; font-size: 12px;
   background: #fff8e1; border: 1px solid #ffe082;
@@ -28,20 +27,20 @@ h1 { color: #2E75B6; font-size: 21px; letter-spacing: 2px; margin-bottom: 4px; }
 /* ── Nav ── */
 .nav { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .nav-btn {
-  background: #2E75B6; color: white; border: none;
+  background: linear-gradient(180deg, #35a8ff 0%, #0d5cff 100%); color: white; border: none;
   border-radius: 50%; width: 38px; height: 38px;
   font-size: 20px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   box-shadow: 0 2px 6px rgba(0,0,0,0.2); transition: background 0.15s; flex-shrink: 0;
 }
-.nav-btn:hover { background: #1F5480; }
-.month-title { font-size: 22px; font-weight: bold; color: #2E75B6; min-width: 130px; text-align: center; }
+.nav-btn:hover { filter: brightness(0.95); }
+.month-title { font-size: 24px; font-weight: 800; color: #135fbd; min-width: 150px; text-align: center; }
 .month-title.current { color: #E65100; }
 
 /* ── Calendar ── */
 .card {
-  background: white; border-radius: 14px;
-  box-shadow: 0 4px 18px rgba(0,0,0,0.12);
+  background: white; border-radius: 22px;
+  box-shadow: 0 10px 28px rgba(47,128,255,0.18);
   overflow: hidden; width: 100%; max-width: 560px;
 }
 .day-names { display: grid; grid-template-columns: repeat(7, 1fr); }
@@ -49,16 +48,16 @@ h1 { color: #2E75B6; font-size: 21px; letter-spacing: 2px; margin-bottom: 4px; }
   text-align: center; padding: 8px 2px;
   font-size: 12px; font-weight: bold;
 }
-.day-name.sun { color: #C00000; background: #FFE8E8; }
-.day-name.sat { color: #1F4E79; background: #DDEEFF; }
-.day-name.wkd { background: #D6E4F0; color: #333; }
+.day-name.sun { color: #e60033; background: #ffe7f0; }
+.day-name.sat { color: #135fbd; background: #e3f2ff; }
+.day-name.wkd { background: #dff1ff; color: #1f3b57; }
 
 .days-grid {
   display: grid; grid-template-columns: repeat(7, 1fr);
-  gap: 2px; padding: 4px; background: #e8ecf0;
+  gap: 3px; padding: 6px; background: #eaf4ff;
 }
 .day {
-  background: white; border-radius: 6px;
+  background: white; border-radius: 10px;
   padding: 5px 3px 4px; font-size: 13px;
   cursor: pointer; user-select: none;
   min-height: 72px;
@@ -71,7 +70,7 @@ h1 { color: #2E75B6; font-size: 21px; letter-spacing: 2px; margin-bottom: 4px; }
 .day.sun    { background: #FFF0F0; }
 .day.sat    { background: #EEF5FF; }
 .day.holiday{ background: #FFE8E8; }
-.day.rest   { background: #E8F5E9 !important; }
+.day.rest   { background: #e7f4ff !important; outline: 3px solid #35a8ff; outline-offset: -3px; }
 .day.today  { background: #FFF9C4 !important; outline: 2px solid #F9A825; outline-offset: -2px; }
 .day.today .day-num { color: #E65100 !important; font-weight: 800; }
 
@@ -83,9 +82,9 @@ h1 { color: #2E75B6; font-size: 21px; letter-spacing: 2px; margin-bottom: 4px; }
 .day-num { font-size: 14px; font-weight: 600; line-height: 1; }
 .day.sun .day-num, .day.holiday .day-num { color: #C00000; }
 .day.sat .day-num { color: #1F4E79; }
-.day.rest .day-num { color: #2e7d32; }
+.day.rest .day-num { color: #0d5cff; }
 .rest-badge {
-  font-size: 9px; background: #4CAF50; color: white;
+  font-size: 9px; background: #0d5cff; color: white;
   border-radius: 3px; padding: 1px 4px; font-weight: bold; line-height: 1.4;
 }
 
@@ -118,8 +117,8 @@ h1 { color: #2E75B6; font-size: 21px; letter-spacing: 2px; margin-bottom: 4px; }
   font-family: inherit; background: white; color: #888;
   transition: all 0.15s; font-weight: bold;
 }
-.mode-btn.active-rest { background: #E8F5E9; border-color: #4CAF50; color: #2e7d32; }
-.mode-btn.active-memo { background: #E3F2FD; border-color: #2E75B6; color: #1565C0; }
+.mode-btn.active-rest { background: #e3f2fd; border-color: #2f80ff; color: #135fbd; }
+.mode-btn.active-memo { background: #fff7d6; border-color: #ffd400; color: #8a6500; }
 body.rest-mode .days-grid .day:not(.empty) { cursor: cell; }
 body.rest-mode .days-grid .day:not(.empty):hover { filter: brightness(0.88); }
 
@@ -151,7 +150,7 @@ body.rest-mode .days-grid .day:not(.empty):hover { filter: brightness(0.88); }
 .btn-hide:hover   { background: #ffe0b2; }
 .btn-manage { background: #f3e5f5; color: #6a1b9a; border: 1px solid #ce93d8; }
 .btn-manage:hover { background: #e1bee7; }
-.btn-lock   { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+.btn-lock   { background: #e3f2fd; color: #135fbd; border: 1px solid #8ecbff; }
 .btn-lock:hover   { background: #c8e6c9; }
 .btn-lock.locked  { background: #fce4ec; color: #c62828; border: 1px solid #ef9a9a; }
 .btn-lock.locked:hover { background: #ffcdd2; }
@@ -247,11 +246,20 @@ body.rest-mode .days-grid .day:not(.empty):hover { filter: brightness(0.88); }
   .card { box-shadow: none; border: 1px solid #ccc; max-width: 100%; }
   h1 { margin-bottom: 8px; }
 }
+
+@media (max-width: 560px) {
+  body { padding: 16px 8px 32px; }
+  h1 { font-size: 26px; margin-top: 12px; }
+  .mode-bar { gap: 6px; }
+  .mode-btn { font-size: 12px; padding: 9px 6px; }
+  .day { min-height: 68px; }
+}
+
 </style>
 </head>
 <body>
 
-<img src="title_hachiware.png" alt="お休みカレンダー" style="max-width:450px;width:100%;">
+<h1>休日カレンダー</h1>
 
 <div class="nav">
   <button class="nav-btn" onclick="changeMonth(-1)">‹</button>
@@ -260,8 +268,8 @@ body.rest-mode .days-grid .day:not(.empty):hover { filter: brightness(0.88); }
 </div>
 
 <div class="mode-bar">
-  <button class="mode-btn active-rest" id="btnRestMode" onclick="setMode('rest')">🟢 お休み入力（タップで色塗り）</button>
-  <button class="mode-btn" id="btnMemoMode" onclick="setMode('memo')">📝 メモ入力</button>
+  <button class="mode-btn active-rest" id="btnRestMode" onclick="setMode('rest')">休日入力（タップで色塗り）</button>
+  <button class="mode-btn" id="btnMemoMode" onclick="setMode('memo')">メモ入力</button>
 </div>
 
 <div class="card">
@@ -269,13 +277,6 @@ body.rest-mode .days-grid .day:not(.empty):hover { filter: brightness(0.88); }
   <div class="days-grid" id="daysGrid"></div>
 </div>
 
-<div class="legend">
-  <div class="legend-item"><div class="legend-box" style="background:#FFF0F0;border-color:#ffaaaa;"></div><span>日曜日</span></div>
-  <div class="legend-item"><div class="legend-box" style="background:#EEF5FF;border-color:#aaccff;"></div><span>土曜日</span></div>
-  <div class="legend-item"><div class="legend-box" style="background:#FFE8E8;border-color:#ff9999;"></div><span>祝日</span></div>
-  <div class="legend-item"><div class="legend-box" style="background:#E8F5E9;border-color:#70ad47;"></div><span>お休み</span></div>
-  <div class="legend-item"><div class="legend-box" style="background:#E3F2FD;border-color:#90caf9;"></div><span>メモ</span></div>
-</div>
 
 <div class="info-bar" id="infoBar"></div>
 
@@ -290,7 +291,7 @@ body.rest-mode .days-grid .day:not(.empty):hover { filter: brightness(0.88); }
   <div class="modal">
     <h2 id="modalTitle"></h2>
     <label class="modal-rest">
-      <input type="checkbox" id="chkRest"> お休みにする 🟢
+      <input type="checkbox" id="chkRest"> 休日にする
     </label>
     <div class="memo-section-title">📝 メモ（時間と内容）</div>
     <div class="memo-entries" id="memoEntries"></div>
@@ -627,7 +628,7 @@ function render() {
   const restCnt = monthKeys.filter(k => data[k].rest).length;
   const memoCnt = monthKeys.reduce((sum, k) => sum + (data[k].memos || []).length, 0);
   let info = [];
-  if (restCnt) info.push(`お休み ${restCnt} 日`);
+  if (restCnt) info.push(`休日 ${restCnt} 日`);
   if (memoCnt) info.push(`メモ ${memoCnt} 件`);
   document.getElementById('infoBar').textContent =
     info.length ? `この月：${info.join('　/')}　設定中` : '';
