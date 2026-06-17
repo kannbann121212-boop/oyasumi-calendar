@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<link rel="apple-touch-icon" href="icon.png">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📅 休日カレンダー</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, 'Helvetica Neue', sans-serif;
+  background: linear-gradient(180deg, #dfeafb 0%, #f7fbff 100%);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 12px 40px;
+}
+h1 { color: #135fbd; font-size: 30px; letter-spacing: 2px; margin: 18px 0 18px; font-weight: 800; text-shadow: 0 2px 0 rgba(255,255,255,0.9); }
+.subtitle {
+  color: #555; font-size: 12px;
+  background: #fff8e1; border: 1px solid #ffe082;
+  border-radius: 6px; padding: 6px 14px;
+  margin-bottom: 16px; text-align: center;
+}
+
+/* ── Nav ── */
+.nav { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.nav-btn {
+  background: linear-gradient(180deg, #35a8ff 0%, #0d5cff 100%); color: white; border: none;
+  border-radius: 50%; width: 38px; height: 38px;
+  font-size: 20px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2); transition: background 0.15s; flex-shrink: 0;
+}
+.nav-btn:hover { filter: brightness(0.95); }
+.month-title { font-size: 24px; font-weight: 800; color: #135fbd; min-width: 150px; text-align: center; }
+.month-title.current { color: #E65100; }
+
+/* ── Calendar ── */
+.card {
+  background: white; border-radius: 22px;
+  box-shadow: 0 10px 28px rgba(47,128,255,0.18);
+  overflow: hidden; width: 100%; max-width: 560px;
+}
+.day-names { display: grid; grid-template-columns: repeat(7, 1fr); }
+.day-name {
+  text-align: center; padding: 8px 2px;
+  font-size: 12px; font-weight: bold;
+}
+.day-name.sun { color: #e60033; background: #ffe7f0; }
+.day-name.sat { color: #135fbd; background: #e3f2ff; }
+.day-name.wkd { background: #dff1ff; color: #1f3b57; }
+
+.days-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 3px; padding: 6px; background: #eaf4ff;
+}
+.day {
+  background: white; border-radius: 10px;
+  padding: 5px 3px 4px; font-size: 13px;
+  cursor: pointer; user-select: none;
+  min-height: 72px;
+  display: flex; flex-direction: column; align-items: stretch;
+  overflow: hidden; position: relative;
+  transition: filter 0.1s;
+}
+.day:hover:not(.empty) { filter: brightness(0.93); }
+.day.empty  { background: transparent; cursor: default; min-height: 72px; }
+.day.sun    { background: #FFF0F0; }
+.day.sat    { background: #EEF5FF; }
+.day.holiday{ background: #FFE8E8; }
+.day.rest   { background: #e7f4ff !important; outline: 3px solid #35a8ff; outline-offset: -3px; }
+.day.today  { background: #FFF9C4 !important; outline: 2px solid #F9A825; outline-offset: -2px; }
+.day.today .day-num { color: #E65100 !important; font-weight: 800; }
+
+/* top row: date number + 休 badge */
+.day-top {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 2px; margin-bottom: 3px;
+}
+.day-num { font-size: 14px; font-weight: 600; line-height: 1; }
+.day.sun .day-num, .day.holiday .day-num { color: #C00000; }
+.day.sat .day-num { color: #1F4E79; }
+.day.rest .day-num { color: #0d5cff; }
+.rest-badge {
+  font-size: 9px; background: #0d5cff; color: white;
+  border-radius: 3px; padding: 1px 4px; font-weight: bold; line-height: 1.4;
+}
+
+/* memo lines inside cell */
+.memo-list { display: flex; flex-direction: column; gap: 2px; }
+.memo-item {
+  background: #E3F2FD; border-radius: 3px;
+  padding: 1px 3px; overflow: hidden;
+}
+.day.rest .memo-item { background: #C8E6C9; }
+.memo-time {
+  font-size: 9px; color: #1565C0; font-weight: bold;
+  line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.day.rest .memo-time { color: #2e7d32; }
+.memo-text {
+  font-size: 9px; color: #333; line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.more-badge { font-size: 8px; color: #888; text-align: center; margin-top: 1px; }
+
+/* ── Mode bar ── */
+.mode-bar {
+  display: flex; gap: 8px; margin-bottom: 10px;
+  justify-content: center; width: 100%; max-width: 560px;
+}
+.mode-btn {
+  flex: 1; padding: 9px 10px; border: 2px solid #ddd;
+  border-radius: 10px; font-size: 13px; cursor: pointer;
+  font-family: inherit; background: white; color: #888;
+  transition: all 0.15s; font-weight: bold;
+}
+.mode-btn.active-rest { background: #e3f2fd; border-color: #2f80ff; color: #135fbd; }
+.mode-btn.active-memo { background: #fff7d6; border-color: #ffd400; color: #8a6500; }
+body.rest-mode .days-grid .day:not(.empty) { cursor: cell; }
+body.rest-mode .days-grid .day:not(.empty):hover { filter: brightness(0.88); }
+
+/* ── Legend ── */
+.legend {
+  display: flex; justify-content: center; flex-wrap: wrap;
+  gap: 12px; margin: 12px 0 4px; font-size: 11px;
+}
+.legend-item { display: flex; align-items: center; gap: 5px; color: #555; }
+.legend-box { width: 14px; height: 14px; border: 1px solid #bbb; border-radius: 3px; }
+
+/* ── Info & Buttons ── */
+.info-bar {
+  margin: 8px 0 3px; color: #375623;
+  font-size: 12px; font-weight: bold;
+  min-height: 18px; text-align: center;
+}
+.buttons { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; justify-content: center; }
+.btn {
+  padding: 9px 16px; border: none; border-radius: 8px;
+  font-size: 13px; cursor: pointer; font-family: inherit;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+.btn-print  { background: #2E75B6; color: white; }
+.btn-print:hover  { background: #1F5480; }
+.btn-reset  { background: #888; color: white; }
+.btn-reset:hover  { background: #666; }
+.btn-hide   { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
+.btn-hide:hover   { background: #ffe0b2; }
+.btn-manage { background: #f3e5f5; color: #6a1b9a; border: 1px solid #ce93d8; }
+.btn-manage:hover { background: #e1bee7; }
+.btn-lock   { background: #e3f2fd; color: #135fbd; border: 1px solid #8ecbff; }
+.btn-lock:hover   { background: #c8e6c9; }
+.btn-lock.locked  { background: #fce4ec; color: #c62828; border: 1px solid #ef9a9a; }
+.btn-lock.locked:hover { background: #ffcdd2; }
+.mode-bar.locked .mode-btn { opacity: 0.4; pointer-events: none; }
+
+/* ── Modal (共通) ── */
+.overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45); z-index: 100;
+  align-items: center; justify-content: center;
+  padding: 16px;
+}
+.overlay.show { display: flex; }
+.modal {
+  background: white; border-radius: 14px;
+  padding: 20px 22px; width: 100%; max-width: 340px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+  max-height: 90vh; overflow-y: auto;
+}
+.modal h2 { color: #2E75B6; font-size: 15px; margin-bottom: 14px; text-align: center; }
+.modal-rest {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 14px; margin-bottom: 14px; cursor: pointer;
+}
+.modal-rest input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: #4CAF50; }
+
+.memo-section-title {
+  font-size: 12px; color: #888; font-weight: bold;
+  margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 4px;
+}
+.memo-entries { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.memo-entry {
+  display: flex; gap: 6px; align-items: center;
+  background: #f8f9fa; border-radius: 8px; padding: 8px 10px;
+}
+.memo-entry input[type="time"] {
+  width: 90px; border: 1px solid #ddd; border-radius: 6px;
+  padding: 5px 6px; font-size: 13px; font-family: inherit; outline: none; flex-shrink: 0;
+}
+.memo-entry input[type="time"]:focus { border-color: #2E75B6; }
+.memo-entry input[type="text"] {
+  flex: 1; border: 1px solid #ddd; border-radius: 6px;
+  padding: 5px 8px; font-size: 13px; font-family: inherit; outline: none; min-width: 0;
+}
+.memo-entry input[type="text"]:focus { border-color: #2E75B6; }
+.memo-entry input[type="text"]::placeholder { color: #bbb; }
+.del-memo-btn {
+  background: none; border: none; cursor: pointer;
+  color: #ccc; font-size: 18px; line-height: 1; padding: 0 2px; flex-shrink: 0;
+}
+.del-memo-btn:hover { color: #e53935; }
+.add-memo-btn {
+  width: 100%; padding: 8px; border: 2px dashed #ccc;
+  border-radius: 8px; background: none; color: #888;
+  font-size: 13px; cursor: pointer; font-family: inherit; transition: all 0.15s;
+}
+.add-memo-btn:hover { border-color: #2E75B6; color: #2E75B6; background: #f0f7ff; }
+
+.modal-btns { display: flex; gap: 10px; margin-top: 14px; }
+.modal-btns button {
+  flex: 1; padding: 9px; border: none;
+  border-radius: 7px; font-size: 13px; cursor: pointer; font-family: inherit;
+}
+.m-save   { background: #2E75B6; color: white; }
+.m-save:hover   { background: #1F5480; }
+.m-cancel { background: #eee; color: #555; }
+.m-cancel:hover { background: #ddd; }
+.m-del-all {
+  width: 100%; padding: 7px; border: none; border-radius: 7px;
+  cursor: pointer; background: #f5f5f5; color: #aaa;
+  font-size: 11px; margin-top: 8px; font-family: inherit;
+}
+.m-del-all:hover { background: #ffe0e0; color: #c00; }
+
+/* 隠した月の管理モーダル */
+.hidden-list { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.hidden-item {
+  display: flex; align-items: center; justify-content: space-between;
+  background: #fff3e0; border-radius: 8px; padding: 10px 14px;
+  font-size: 14px; color: #555;
+}
+.restore-btn {
+  background: #4CAF50; color: white; border: none;
+  border-radius: 6px; padding: 5px 12px; font-size: 12px;
+  cursor: pointer; font-family: inherit;
+}
+.restore-btn:hover { background: #388e3c; }
+.empty-hidden { text-align: center; color: #aaa; font-size: 13px; padding: 20px 0; }
+
+@media print {
+  body { background: white; padding: 5px; }
+  .buttons, .subtitle, .legend, .info-bar, .overlay, .nav, .mode-bar { display: none !important; }
+  .card { box-shadow: none; border: 1px solid #ccc; max-width: 100%; }
+  h1 { margin-bottom: 8px; }
+}
+
+@media (max-width: 560px) {
+  body { padding: 16px 8px 32px; }
+  h1 { font-size: 26px; margin-top: 12px; }
+  .mode-bar { gap: 6px; }
+  .mode-btn { font-size: 12px; padding: 9px 6px; }
+  .day { min-height: 68px; }
+}
+
+</style>
+</head>
+<body>
+
+<h1>休日カレンダー</h1>
+
+
+<div class="nav" style="justify-content:center;margin-bottom:8px;">
+  <div class="month-title" id="monthTitle"></div>
+</div>
+
+<div class="mode-bar" style="max-width:320px;margin:0 auto 14px;">
+  <button class="mode-btn active-rest" id="lockBtn">🔒 ロック</button>
+  <button class="mode-btn" id="editBtn">✏️ 編集</button>
+</div>
+
+
+<div class="card">
+  <div class="day-names" id="dayNames"></div>
+  <div class="days-grid" id="daysGrid"></div>
+</div>
+
+
+<div class="info-bar" id="infoBar"></div>
+
+<div class="buttons">
+  
+  <button class="btn btn-hide"   onclick="deleteOldMonths()">🗑️ 古い月を消去</button>
+  <button class="btn btn-reset"  onclick="resetAll()">↩️ リセット</button>
+</div>
+
+<!-- メモ編集モーダル -->
+<div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h2 id="modalTitle"></h2>
+    <label class="modal-rest">
+      <input type="checkbox" id="chkRest"> 休日にする
+    </label>
+    <div class="memo-section-title">📝 メモ（時間と内容）</div>
+    <div class="memo-entries" id="memoEntries"></div>
+    <button class="add-memo-btn" onclick="addMemoRow()">＋ メモを追加</button>
+    <div class="modal-btns">
+      <button class="m-cancel" onclick="closeModal()">キャンセル</button>
+      <button class="m-save"   onclick="saveModal()">保存</button>
+    </div>
+    <button class="m-del-all" onclick="deleteEntry()">この日の設定をすべて削除</button>
+  </div>
+</div>
+
+
+<script>
+/* ── 祝日データ（2024〜2027年） ── */
+const HOLIDAYS = {
+  /* 2024 */
+  '2024-01-01':'元日','2024-01-08':'成人の日',
+  '2024-02-11':'建国記念の日','2024-02-12':'振替休日','2024-02-23':'天皇誕生日',
+  '2024-03-20':'春分の日',
+  '2024-04-29':'昭和の日',
+  '2024-05-03':'憲法記念日','2024-05-04':'みどりの日','2024-05-05':'こどもの日','2024-05-06':'振替休日',
+  '2024-07-15':'海の日','2024-08-11':'山の日','2024-08-12':'振替休日',
+  '2024-09-16':'敬老の日','2024-09-22':'秋分の日','2024-09-23':'振替休日',
+  '2024-10-14':'スポーツの日',
+  '2024-11-03':'文化の日','2024-11-04':'振替休日','2024-11-23':'勤労感謝の日',
+  /* 2025 */
+  '2025-01-01':'元日','2025-01-13':'成人の日',
+  '2025-02-11':'建国記念の日','2025-02-23':'天皇誕生日','2025-02-24':'振替休日',
+  '2025-03-20':'春分の日',
+  '2025-04-29':'昭和の日',
+  '2025-05-03':'憲法記念日','2025-05-04':'みどりの日','2025-05-05':'こどもの日','2025-05-06':'振替休日',
+  '2025-07-21':'海の日','2025-08-11':'山の日',
+  '2025-09-15':'敬老の日','2025-09-23':'秋分の日',
+  '2025-10-13':'スポーツの日',
+  '2025-11-03':'文化の日','2025-11-23':'勤労感謝の日','2025-11-24':'振替休日',
+  /* 2026 */
+  '2026-01-01':'元日','2026-01-12':'成人の日',
+  '2026-02-11':'建国記念の日','2026-02-23':'天皇誕生日',
+  '2026-03-20':'春分の日',
+  '2026-04-29':'昭和の日',
+  '2026-05-03':'憲法記念日','2026-05-04':'みどりの日','2026-05-05':'こどもの日','2026-05-06':'振替休日',
+  '2026-07-20':'海の日','2026-08-11':'山の日',
+  '2026-09-21':'敬老の日','2026-09-22':'国民の休日','2026-09-23':'秋分の日',
+  '2026-10-12':'スポーツの日',
+  '2026-11-03':'文化の日','2026-11-23':'勤労感謝の日',
+  /* 2027 */
+  '2027-01-01':'元日','2027-01-11':'成人の日',
+  '2027-02-11':'建国記念の日','2027-02-23':'天皇誕生日',
+  '2027-03-21':'春分の日',
+  '2027-04-29':'昭和の日',
+  '2027-05-03':'憲法記念日','2027-05-04':'みどりの日','2027-05-05':'こどもの日',
+  '2027-07-19':'海の日','2027-08-11':'山の日',
+  '2027-09-20':'敬老の日','2027-09-23':'秋分の日',
+  '2027-10-11':'スポーツの日',
+  '2027-11-03':'文化の日','2027-11-23':'勤労感謝の日',
+};
+
+const MONTH_NAMES = ['','1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+const DAY_NAMES   = ['日','月','火','水','木','金','土'];
+const MAX_DISPLAY = 3;
+
+const todayDate = new Date();
+let curYear  = todayDate.getFullYear();
+let curMonth = todayDate.getMonth() + 1;
+let currentMode = 'rest';
+let currentKey  = null;
+let isLocked    = true;
+
+/* データ形式: { 'YYYY-MM-DD': { rest: bool, memos: [{time, text}] } } */
+let data = JSON.parse(localStorage.getItem('calData') || '{}');
+/* 遡れる最古の月 "YYYY-MM"（消去済み境界） */
+let earliestYM = localStorage.getItem('calEarliest') || null;
+
+/* ── 保存 ── */
+function save() { localStorage.setItem('calData', JSON.stringify(data)); }
+function saveEarliest() { localStorage.setItem('calEarliest', earliestYM); }
+function dateKey(y, m, d) {
+  return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+function monthKey(y, m) { return `${y}-${String(m).padStart(2,'0')}`; }
+
+/* ── 編集ロック ── */
+function toggleLock() {
+  isLocked = !isLocked;
+  const btn = document.getElementById('btnLock');
+  const modeBar = document.querySelector('.mode-bar');
+  if (isLocked) {
+    btn.textContent = '🔒 ロック中';
+    btn.classList.add('locked');
+    modeBar.classList.add('locked');
+  } else {
+    btn.textContent = '🔓 編集中';
+    btn.classList.remove('locked');
+    modeBar.classList.remove('locked');
+  }
+}
+
+/* ── モード切替 ── */
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('btnRestMode').className =
+    'mode-btn' + (mode === 'rest' ? ' active-rest' : '');
+  document.getElementById('btnMemoMode').className =
+    'mode-btn' + (mode === 'memo' ? ' active-memo' : '');
+  document.body.className = mode === 'rest' ? 'rest-mode' : '';
+}
+
+/* ── 月移動 ── */
+function changeMonth(dir) {
+  let y = curYear, m = curMonth;
+  m += dir;
+  if (m > 12) { m = 1;  y++; }
+  if (m < 1)  { m = 12; y--; }
+  // 消去済みの境界より前には戻れない
+  if (earliestYM && monthKey(y, m) < earliestYM) return;
+  curYear = y; curMonth = m;
+  render();
+}
+
+/* ── 古い月を消去（前月だけ残してそれより古いデータを削除） ── */
+function deleteOldMonths() {
+  // 実際の今月・前月を基準にする（表示中の月ではなく）
+  const realY = todayDate.getFullYear(), realM = todayDate.getMonth() + 1;
+  let prevY = realY, prevM = realM - 1;
+  if (prevM < 1) { prevM = 12; prevY--; }
+  const prevPrefix = `${prevY}-${String(prevM).padStart(2,'0')}`;
+  const curPrefix  = `${realY}-${String(realM).padStart(2,'0')}`;
+
+  // 消す対象のキーを探す（今月・前月より古いもの）
+  const toDelete = Object.keys(data).filter(k => {
+    const ym = k.slice(0, 7); // "YYYY-MM"
+    return ym !== prevPrefix && ym !== curPrefix && ym < prevPrefix;
+  });
+
+  toDelete.forEach(k => delete data[k]);
+  // 遡れる境界を前月に設定
+  earliestYM = prevPrefix;
+  save();
+  saveEarliest();
+  // 表示中の月が消去範囲に入っていたら前月へ移動
+  if (monthKey(curYear, curMonth) < earliestYM) {
+    curYear = prevY; curMonth = prevM;
+  }
+  render();
+}
+
+/* ── メモモーダル ── */
+function openModal(y, m, d) {
+  currentKey = dateKey(y, m, d);
+  const entry = data[currentKey] || {};
+  const wday  = new Date(y, m - 1, d).getDay();
+  const hname = HOLIDAYS[currentKey] ? `（${HOLIDAYS[currentKey]}）` : '';
+  document.getElementById('modalTitle').textContent =
+    `${y}年${MONTH_NAMES[m]}${d}日（${DAY_NAMES[wday]}）${hname}`;
+  document.getElementById('chkRest').checked = !!entry.rest;
+
+  const container = document.getElementById('memoEntries');
+  container.innerHTML = '';
+  const memos = entry.memos || [];
+  if (memos.length === 0) {
+    addMemoRow();
+  } else {
+    memos.forEach(memo => addMemoRow(memo.time, memo.text));
+  }
+  document.getElementById('overlay').classList.add('show');
+}
+
+function addMemoRow(time = '', text = '') {
+  const container = document.getElementById('memoEntries');
+  const row = document.createElement('div');
+  row.className = 'memo-entry';
+  row.innerHTML = `
+    <input type="time" value="${time}" placeholder="時間">
+    <input type="text" value="${text}" placeholder="内容を入力…" maxlength="20">
+    <button class="del-memo-btn" onclick="this.parentElement.remove()" title="削除">×</button>
+  `;
+  container.appendChild(row);
+  row.querySelector('input[type="text"]').focus();
+}
+
+function closeModal() {
+  document.getElementById('overlay').classList.remove('show');
+  currentKey = null;
+}
+
+function saveModal() {
+  if (!currentKey) return;
+  const rest = document.getElementById('chkRest').checked;
+  const rows  = document.querySelectorAll('#memoEntries .memo-entry');
+  const memos = [];
+  rows.forEach(row => {
+    const t = row.querySelector('input[type="time"]').value.trim();
+    const x = row.querySelector('input[type="text"]').value.trim();
+    if (x) memos.push({ time: t, text: x });
+  });
+  if (rest || memos.length > 0) {
+    data[currentKey] = { rest, memos };
+  } else {
+    delete data[currentKey];
+  }
+  save(); render(); closeModal();
+}
+
+function deleteEntry() {
+  if (!currentKey) return;
+  delete data[currentKey];
+  save(); render(); closeModal();
+}
+
+/* ── お休みトグル ── */
+function toggleRest(y, m, d) {
+  const k = dateKey(y, m, d);
+  const entry = data[k] || {};
+  const newRest = !entry.rest;
+  if (newRest || (entry.memos && entry.memos.length > 0)) {
+    data[k] = { ...entry, rest: newRest };
+  } else {
+    delete data[k];
+  }
+  save(); render();
+}
+
+/* ── 描画 ── */
+function render() {
+  const y = curYear, m = curMonth;
+  const titleEl = document.getElementById('monthTitle');
+  titleEl.textContent = `${y}年${MONTH_NAMES[m]}`;
+  const isCurrentMonth = (y === todayDate.getFullYear() && m === todayDate.getMonth() + 1);
+  titleEl.className = 'month-title' + (isCurrentMonth ? ' current' : '');
+
+  // 前月方向ボタン：消去境界に達したら無効化
+  let prevY2 = y, prevM2 = m - 1;
+  if (prevM2 < 1) { prevM2 = 12; prevY2--; }
+  const prevBtn = document.querySelector('.nav-btn:first-child');
+  prevBtn.disabled = !!(earliestYM && monthKey(prevY2, prevM2) < earliestYM);
+
+  // 曜日ヘッダー
+  const dnRow = document.getElementById('dayNames');
+  dnRow.innerHTML = '';
+  DAY_NAMES.forEach((n, i) => {
+    const c = document.createElement('div');
+    c.className = 'day-name ' + (i === 0 ? 'sun' : i === 6 ? 'sat' : 'wkd');
+    c.textContent = n;
+    dnRow.appendChild(c);
+  });
+
+  // 日付グリッド
+  const grid    = document.getElementById('daysGrid');
+  grid.innerHTML = '';
+  const numDays  = new Date(y, m, 0).getDate();
+  const firstDay = new Date(y, m - 1, 1).getDay();
+
+  for (let i = 0; i < firstDay; i++) {
+    const e = document.createElement('div');
+    e.className = 'day empty';
+    grid.appendChild(e);
+  }
+
+  for (let d = 1; d <= numDays; d++) {
+    const k     = dateKey(y, m, d);
+    const entry = data[k] || {};
+    const memos = entry.memos || [];
+    const col   = (firstDay + d - 1) % 7;
+    const isH   = !!HOLIDAYS[k];
+    const isSu  = col === 0;
+    const isSa  = col === 6;
+    const isToday = (y === todayDate.getFullYear() && m === todayDate.getMonth() + 1 && d === todayDate.getDate());
+
+    const cell = document.createElement('div');
+    let cls = 'day';
+    if      (entry.rest) cls += ' rest';
+    else if (isH)        cls += ' holiday';
+    else if (isSu)       cls += ' sun';
+    else if (isSa)       cls += ' sat';
+    if (isToday)         cls += ' today';
+    cell.className = cls;
+
+    // 日付 + 休バッジ
+    const top = document.createElement('div');
+    top.className = 'day-top';
+    const num = document.createElement('span');
+    num.className = 'day-num';
+    num.textContent = d;
+    top.appendChild(num);
+    if (entry.rest) {
+      const badge = document.createElement('span');
+      badge.className = 'rest-badge';
+      badge.textContent = '休';
+      top.appendChild(badge);
+    }
+    cell.appendChild(top);
+
+    // メモ表示
+    if (memos.length > 0) {
+      const list = document.createElement('div');
+      list.className = 'memo-list';
+      memos.slice(0, MAX_DISPLAY).forEach(memo => {
+        const item = document.createElement('div');
+        item.className = 'memo-item';
+        if (memo.time) {
+          const tLine = document.createElement('div');
+          tLine.className = 'memo-time';
+          tLine.textContent = memo.time;
+          item.appendChild(tLine);
+        }
+        const xLine = document.createElement('div');
+        xLine.className = 'memo-text';
+        xLine.textContent = memo.text;
+        item.appendChild(xLine);
+        list.appendChild(item);
+      });
+      if (memos.length > MAX_DISPLAY) {
+        const more = document.createElement('div');
+        more.className = 'more-badge';
+        more.textContent = `他 ${memos.length - MAX_DISPLAY} 件`;
+        list.appendChild(more);
+      }
+      cell.appendChild(list);
+    }
+
+    if (isH && !entry.rest && memos.length === 0) cell.title = HOLIDAYS[k];
+    cell.addEventListener('click', () => {
+      if (isLocked) return;
+      if (currentMode === 'rest') toggleRest(y, m, d);
+      else openModal(y, m, d);
+    });
+    grid.appendChild(cell);
+  }
+
+  // インフォバー
+  const prefix = `${y}-${String(m).padStart(2,'0')}`;
+  const monthKeys = Object.keys(data).filter(k => k.startsWith(prefix));
+  const restCnt = monthKeys.filter(k => data[k].rest).length;
+  const memoCnt = monthKeys.reduce((sum, k) => sum + (data[k].memos || []).length, 0);
+  let info = [];
+  if (restCnt) info.push(`休日 ${restCnt} 日`);
+  if (memoCnt) info.push(`メモ ${memoCnt} 件`);
+  document.getElementById('infoBar').textContent =
+    info.length ? `この月：${info.join('　/')}　設定中` : '';
+
+}
+
+/* ── リセット（表示中の月だけ） ── */
+function resetAll() {
+  const prefix = monthKey(curYear, curMonth);
+  Object.keys(data).filter(k => k.startsWith(prefix)).forEach(k => delete data[k]);
+  save(); render();
+}
+
+/* キーボード */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+});
+
+
+/* ===== 最終版追加 ===== */
+isLocked = true;
+
+function updateButtons(){
+ const l=document.getElementById('lockBtn');
+ const e=document.getElementById('editBtn');
+ if(!l||!e) return;
+ if(isLocked){
+   l.classList.add('active-rest');
+   e.classList.remove('active-rest');
+ }else{
+   e.classList.add('active-rest');
+   l.classList.remove('active-rest');
+ }
+}
+
+setTimeout(()=>{
+ document.getElementById('lockBtn')?.addEventListener('click',()=>{
+   isLocked=true; updateButtons();
+ });
+ document.getElementById('editBtn')?.addEventListener('click',()=>{
+   isLocked=false; updateButtons();
+ });
+ updateButtons();
+},50);
+
+/* スワイプ */
+let startX=0,startY=0;
+document.addEventListener('touchstart',e=>{
+ startX=e.touches[0].clientX;
+ startY=e.touches[0].clientY;
+},{passive:true});
+
+document.addEventListener('touchend',e=>{
+ const dx=e.changedTouches[0].clientX-startX;
+ const dy=e.changedTouches[0].clientY-startY;
+ if(Math.abs(dx)>70 && Math.abs(dx)>Math.abs(dy)){
+   const card=document.querySelector('.card');
+   if(card){
+     card.style.transition='all .2s';
+     card.style.transform=`translateX(${dx<0?-40:40}px)`;
+     card.style.opacity='0.7';
+   }
+   setTimeout(()=>{
+      if(dx<0) changeMonth(1); else changeMonth(-1);
+      if(card){
+        card.style.transform='translateX(0)';
+        card.style.opacity='1';
+      }
+   },120);
+ }
+},{passive:true});
+
+/* Macトラックパッド */
+let wheelBusy=false;
+document.addEventListener('wheel',e=>{
+ if(wheelBusy || Math.abs(e.deltaX)<40) return;
+ wheelBusy=true;
+ if(e.deltaX>0) changeMonth(1); else changeMonth(-1);
+ setTimeout(()=>wheelBusy=false,500);
+},{passive:true});
+
+/* 長押しメモ編集 */
+let pressTimer=null;
+
+document.addEventListener('mousedown',e=>{
+ const day=e.target.closest('.day');
+ if(!day || day.classList.contains('empty') || isLocked) return;
+ pressTimer=setTimeout(()=>{
+   day.dataset.longpress='1';
+   day.click();
+ },550);
+});
+
+document.addEventListener('mouseup',()=>clearTimeout(pressTimer));
+
+document.addEventListener('touchstart',e=>{
+ const day=e.target.closest('.day');
+ if(!day || day.classList.contains('empty') || isLocked) return;
+ pressTimer=setTimeout(()=>{
+   day.dataset.longpress='1';
+   day.click();
+ },550);
+},{passive:true});
+
+document.addEventListener('touchend',()=>clearTimeout(pressTimer));
+
+render();
+</script>
+</body>
+</html>
