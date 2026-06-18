@@ -628,12 +628,15 @@ function render() {
     if (isH && !entry.rest && memos.length === 0) cell.title = HOLIDAYS[k];
     cell.addEventListener('click', () => {
       if (isLocked) return;
-      if(cell.dataset.longpress==='1'){
-        cell.dataset.longpress='';
-        openModal(y,m,d);
-      } else {
-        toggleRest(y,m,d);
-      }
+    cell.addEventListener('click', () => {
+  if (isLocked) return;
+  toggleRest(y,m,d);
+});
+
+cell.addEventListener('dblclick', () => {
+  if (isLocked) return;
+  openModal(y,m,d);
+});
     });
     grid.appendChild(cell);
   }
@@ -711,32 +714,7 @@ document.addEventListener('wheel',e=>{
  setTimeout(()=>wheelBusy=false,400);
 },{passive:true});
 
-/* long press => memo */
-let pressTimer=null;
 
-document.addEventListener('mousedown',e=>{
- const day=e.target.closest('.day');
- if(!day || day.classList.contains('empty') || isLocked) return;
-
- pressTimer=setTimeout(()=>{
-   day.dataset.longpress='1';
-   day.click();
- },500);
-});
-
-document.addEventListener('mouseup',()=>clearTimeout(pressTimer));
-
-document.addEventListener('touchstart',e=>{
- const day=e.target.closest('.day');
- if(!day || day.classList.contains('empty') || isLocked) return;
-
- pressTimer=setTimeout(()=>{
-   day.dataset.longpress='1';
-   day.click();
- },500);
-},{passive:true});
-
-document.addEventListener('touchend',()=>clearTimeout(pressTimer));
 
 render();
 </script>
