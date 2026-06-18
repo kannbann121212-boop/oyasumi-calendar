@@ -717,8 +717,10 @@ let pressTimer=null;
 document.addEventListener('mousedown',e=>{
  const day=e.target.closest('.day');
  if(!day || day.classList.contains('empty') || isLocked) return;
+
  pressTimer=setTimeout(()=>{
    day.dataset.longpress='1';
+   day.click();
  },500);
 });
 
@@ -727,8 +729,10 @@ document.addEventListener('mouseup',()=>clearTimeout(pressTimer));
 document.addEventListener('touchstart',e=>{
  const day=e.target.closest('.day');
  if(!day || day.classList.contains('empty') || isLocked) return;
+
  pressTimer=setTimeout(()=>{
    day.dataset.longpress='1';
+   day.click();
  },500);
 },{passive:true});
 
