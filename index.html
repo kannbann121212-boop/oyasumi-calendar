@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<link rel="icon" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>休日カレンダー</title>
+<title>📅 休日カレンダー</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -299,7 +298,7 @@ font-size:14px;
 font-weight:600;
 color:#444;">
 <div>🔵 タップ：休日ON/OFF</div>
-<div>🟢 長押し（約0.5秒）：メモ編集</div>
+<div>🟢 ダブルタップ：メモ編集</div>
 </div>
 
 <!-- メモ編集モーダル -->
@@ -628,15 +627,21 @@ function render() {
     if (isH && !entry.rest && memos.length === 0) cell.title = HOLIDAYS[k];
     cell.addEventListener('click', () => {
       if (isLocked) return;
-    cell.addEventListener('click', () => {
-  if (isLocked) return;
-  toggleRest(y,m,d);
-});
 
-cell.addEventListener('dblclick', () => {
-  if (isLocked) return;
-  openModal(y,m,d);
-});
+      const now = Date.now();
+      const lastTap = Number(cell.dataset.lastTap || 0);
+
+      if (now - lastTap < 300) {
+        cell.dataset.lastTap = 0;
+        openModal(y,m,d);
+      } else {
+        cell.dataset.lastTap = now;
+        setTimeout(() => {
+          if (Number(cell.dataset.lastTap) === now) {
+            toggleRest(y,m,d);
+          }
+        }, 300);
+      }
     });
     grid.appendChild(cell);
   }
@@ -713,8 +718,6 @@ document.addEventListener('wheel',e=>{
  changeMonth(e.deltaX>0?1:-1);
  setTimeout(()=>wheelBusy=false,400);
 },{passive:true});
-
-
 
 render();
 </script>
