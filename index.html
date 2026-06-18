@@ -266,8 +266,8 @@ body.rest-mode .days-grid .day:not(.empty):hover { filter: brightness(0.88); }
 </div>
 
 <div class="mode-bar">
-  <button class="mode-btn active-rest" id="lockBtn">🔒 ロック</button>
   <button class="mode-btn" id="editBtn">✏️ 編集</button>
+  <button class="mode-btn active-rest" id="lockBtn">🔒 ロック</button>
 </div>
 
 <div class="card">
@@ -282,6 +282,23 @@ body.rest-mode .days-grid .day:not(.empty):hover { filter: brightness(0.88); }
   
   <button class="btn btn-hide"   onclick="deleteOldMonths()">🗑️ 古い月を消去</button>
   <button class="btn btn-reset"  onclick="resetAll()">↩️ リセット</button>
+</div>
+
+<div style="
+max-width:560px;
+width:100%;
+margin-top:18px;
+padding:16px;
+background:white;
+border:1px solid #d7e6ff;
+border-radius:14px;
+display:flex;
+justify-content:space-around;
+font-size:14px;
+font-weight:600;
+color:#444;">
+<div>🔵 タップ：休日ON/OFF</div>
+<div>🟢 長押し（約0.5秒）：メモ編集</div>
 </div>
 
 <!-- メモ編集モーダル -->
