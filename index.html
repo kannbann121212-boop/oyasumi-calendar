@@ -261,16 +261,14 @@ body.rest-mode .days-grid .day:not(.empty):hover { filter: brightness(0.88); }
 
 <h1>休日カレンダー</h1>
 
-
-<div class="nav" style="justify-content:center;margin-bottom:8px;">
+<div class="nav" style="justify-content:center">
   <div class="month-title" id="monthTitle"></div>
 </div>
 
-<div class="mode-bar" style="max-width:320px;margin:0 auto 14px;">
+<div class="mode-bar">
   <button class="mode-btn active-rest" id="lockBtn">🔒 ロック</button>
   <button class="mode-btn" id="editBtn">✏️ 編集</button>
 </div>
-
 
 <div class="card">
   <div class="day-names" id="dayNames"></div>
@@ -523,11 +521,7 @@ function render() {
   const isCurrentMonth = (y === todayDate.getFullYear() && m === todayDate.getMonth() + 1);
   titleEl.className = 'month-title' + (isCurrentMonth ? ' current' : '');
 
-  // 前月方向ボタン：消去境界に達したら無効化
-  let prevY2 = y, prevM2 = m - 1;
-  if (prevM2 < 1) { prevM2 = 12; prevY2--; }
-  const prevBtn = document.querySelector('.nav-btn:first-child');
-  prevBtn.disabled = !!(earliestYM && monthKey(prevY2, prevM2) < earliestYM);
+  
 
   // 曜日ヘッダー
   const dnRow = document.getElementById('dayNames');
@@ -616,8 +610,12 @@ function render() {
     if (isH && !entry.rest && memos.length === 0) cell.title = HOLIDAYS[k];
     cell.addEventListener('click', () => {
       if (isLocked) return;
-      if (currentMode === 'rest') toggleRest(y, m, d);
-      else openModal(y, m, d);
+      if(cell.dataset.longpress==='1'){
+        cell.dataset.longpress='';
+        openModal(y,m,d);
+      } else {
+        toggleRest(y,m,d);
+      }
     });
     grid.appendChild(cell);
   }
@@ -648,13 +646,12 @@ document.addEventListener('keydown', e => {
 });
 
 
-/* ===== 最終版追加 ===== */
-isLocked = true;
+/* ===== FINAL CUSTOM ===== */
+currentMode='rest';
 
-function updateButtons(){
+function updateTopButtons(){
  const l=document.getElementById('lockBtn');
  const e=document.getElementById('editBtn');
- if(!l||!e) return;
  if(isLocked){
    l.classList.add('active-rest');
    e.classList.remove('active-rest');
@@ -665,52 +662,38 @@ function updateButtons(){
 }
 
 setTimeout(()=>{
- document.getElementById('lockBtn')?.addEventListener('click',()=>{
-   isLocked=true; updateButtons();
- });
- document.getElementById('editBtn')?.addEventListener('click',()=>{
-   isLocked=false; updateButtons();
- });
- updateButtons();
-},50);
+ const l=document.getElementById('lockBtn');
+ const e=document.getElementById('editBtn');
+ if(l) l.onclick=()=>{isLocked=true;updateTopButtons();};
+ if(e) e.onclick=()=>{isLocked=false;updateTopButtons();};
+ updateTopButtons();
+},100);
 
-/* スワイプ */
-let startX=0,startY=0;
+/* swipe */
+let sx=0, sy=0;
 document.addEventListener('touchstart',e=>{
- startX=e.touches[0].clientX;
- startY=e.touches[0].clientY;
+ sx=e.touches[0].clientX;
+ sy=e.touches[0].clientY;
 },{passive:true});
 
 document.addEventListener('touchend',e=>{
- const dx=e.changedTouches[0].clientX-startX;
- const dy=e.changedTouches[0].clientY-startY;
- if(Math.abs(dx)>70 && Math.abs(dx)>Math.abs(dy)){
-   const card=document.querySelector('.card');
-   if(card){
-     card.style.transition='all .2s';
-     card.style.transform=`translateX(${dx<0?-40:40}px)`;
-     card.style.opacity='0.7';
-   }
-   setTimeout(()=>{
-      if(dx<0) changeMonth(1); else changeMonth(-1);
-      if(card){
-        card.style.transform='translateX(0)';
-        card.style.opacity='1';
-      }
-   },120);
+ const dx=e.changedTouches[0].clientX-sx;
+ const dy=e.changedTouches[0].clientY-sy;
+ if(Math.abs(dx)>80 && Math.abs(dx)>Math.abs(dy)){
+   changeMonth(dx<0?1:-1);
  }
 },{passive:true});
 
-/* Macトラックパッド */
+/* mac trackpad */
 let wheelBusy=false;
 document.addEventListener('wheel',e=>{
  if(wheelBusy || Math.abs(e.deltaX)<40) return;
  wheelBusy=true;
- if(e.deltaX>0) changeMonth(1); else changeMonth(-1);
- setTimeout(()=>wheelBusy=false,500);
+ changeMonth(e.deltaX>0?1:-1);
+ setTimeout(()=>wheelBusy=false,400);
 },{passive:true});
 
-/* 長押しメモ編集 */
+/* long press => memo */
 let pressTimer=null;
 
 document.addEventListener('mousedown',e=>{
@@ -718,8 +701,7 @@ document.addEventListener('mousedown',e=>{
  if(!day || day.classList.contains('empty') || isLocked) return;
  pressTimer=setTimeout(()=>{
    day.dataset.longpress='1';
-   day.click();
- },550);
+ },500);
 });
 
 document.addEventListener('mouseup',()=>clearTimeout(pressTimer));
@@ -729,8 +711,7 @@ document.addEventListener('touchstart',e=>{
  if(!day || day.classList.contains('empty') || isLocked) return;
  pressTimer=setTimeout(()=>{
    day.dataset.longpress='1';
-   day.click();
- },550);
+ },500);
 },{passive:true});
 
 document.addEventListener('touchend',()=>clearTimeout(pressTimer));
