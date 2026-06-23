@@ -1,12 +1,10 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<link rel="icon" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
-  
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>休日カレンダー</title>
+<title>📅 休日カレンダー</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -17,7 +15,16 @@ body {
   flex-direction: column;
   align-items: center;
   padding: 20px 12px 40px;
+  transition: background 0.3s;
 }
+body.editing {
+  background: linear-gradient(180deg, #ffe0b2 0%, #fff8f0 100%);
+}
+body.editing h1 { color: #e65100; }
+body.editing .card { box-shadow: 0 10px 28px rgba(255,120,0,0.22); }
+body.editing .days-grid { background: #ffd9a8; }
+body.editing .month-title { color: #e65100 !important; }
+body.editing .nav-btn { background: linear-gradient(180deg, #ffb74d 0%, #f57c00 100%); }
 h1 { color: #135fbd; font-size: 30px; letter-spacing: 2px; margin: 18px 0 18px; font-weight: 800; text-shadow: 0 2px 0 rgba(255,255,255,0.9); }
 .subtitle {
   color: #555; font-size: 12px;
@@ -51,7 +58,7 @@ h1 { color: #135fbd; font-size: 30px; letter-spacing: 2px; margin: 18px 0 18px; 
   font-size: 12px; font-weight: bold;
 }
 .day-name.sun { color: #e60033; background: #ffe7f0; }
-.day-name.sat { color: #135fbd; background: #e3f2ff; }
+.day-name.sat { color: #0a4db5; background: #b3d4ff; }
 .day-name.wkd { background: #dff1ff; color: #1f3b57; }
 
 .days-grid {
@@ -70,7 +77,7 @@ h1 { color: #135fbd; font-size: 30px; letter-spacing: 2px; margin: 18px 0 18px; 
 .day:hover:not(.empty) { filter: brightness(0.93); }
 .day.empty  { background: transparent; cursor: default; min-height: 72px; }
 .day.sun    { background: #FFF0F0; }
-.day.sat    { background: #EEF5FF; }
+.day.sat    { background: #cce3ff; }
 .day.holiday{ background: #FFE8E8; }
 .day.rest   { background: #e7f4ff !important; outline: 3px solid #35a8ff; outline-offset: -3px; }
 .day.today  { background: #FFF9C4 !important; outline: 2px solid #F9A825; outline-offset: -2px; }
@@ -83,7 +90,7 @@ h1 { color: #135fbd; font-size: 30px; letter-spacing: 2px; margin: 18px 0 18px; 
 }
 .day-num { font-size: 14px; font-weight: 600; line-height: 1; }
 .day.sun .day-num, .day.holiday .day-num { color: #C00000; }
-.day.sat .day-num { color: #1F4E79; }
+.day.sat .day-num { color: #0a4db5; font-weight: 700; }
 .day.rest .day-num { color: #0d5cff; }
 .rest-badge {
   font-size: 9px; background: #0d5cff; color: white;
@@ -121,6 +128,7 @@ h1 { color: #135fbd; font-size: 30px; letter-spacing: 2px; margin: 18px 0 18px; 
 }
 .mode-btn.active-rest { background: #e3f2fd; border-color: #2f80ff; color: #135fbd; }
 .mode-btn.active-memo { background: #fff7d6; border-color: #ffd400; color: #8a6500; }
+.mode-btn.active-edit { background: #fff3e0; border-color: #ff9800; color: #e65100; font-weight: bold; }
 body.rest-mode .days-grid .day:not(.empty) { cursor: cell; }
 body.rest-mode .days-grid .day:not(.empty):hover { filter: brightness(0.88); }
 
@@ -265,6 +273,13 @@ body.rest-mode .days-grid .day:not(.empty):hover { filter: brightness(0.88); }
 
 <div class="nav" style="justify-content:center">
   <div class="month-title" id="monthTitle"></div>
+  <button onclick="goToday()" style="
+    background:linear-gradient(180deg,#ff9800,#e65100);
+    color:white;border:none;border-radius:20px;
+    padding:6px 14px;font-size:12px;font-weight:bold;
+    cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.2);
+    font-family:inherit;margin-left:10px;
+  ">今月</button>
 </div>
 
 <div class="mode-bar">
@@ -677,15 +692,27 @@ document.addEventListener('keydown', e => {
 /* ===== FINAL CUSTOM ===== */
 currentMode='rest';
 
+function goToday() {
+  curYear  = todayDate.getFullYear();
+  curMonth = todayDate.getMonth() + 1;
+  render();
+}
+
 function updateTopButtons(){
  const l=document.getElementById('lockBtn');
  const e=document.getElementById('editBtn');
  if(isLocked){
    l.classList.add('active-rest');
-   e.classList.remove('active-rest');
+   l.textContent='🔒 ロック';
+   e.classList.remove('active-edit');
+   e.textContent='✏️ 編集';
+   document.body.classList.remove('editing');
  }else{
-   e.classList.add('active-rest');
+   e.classList.add('active-edit');
+   e.textContent='✏️ 編集中';
    l.classList.remove('active-rest');
+   l.textContent='🔒 ロック';
+   document.body.classList.add('editing');
  }
 }
 
