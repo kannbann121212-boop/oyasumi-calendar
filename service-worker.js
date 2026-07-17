@@ -1,4 +1,4 @@
-const CACHE = 'yasumi-cal-v2';
+const CACHE = 'yasumi-cal-v3';
 const FILES = ['./index.html', './manifest.json'];
 
 self.addEventListener('install', e =>
