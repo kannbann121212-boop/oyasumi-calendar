@@ -529,8 +529,7 @@ body:not(.locked) .day:not(.empty):active{ filter:brightness(0.94); }
   <div class="modal">
     <h2>使い方</h2>
     <div class="help-list">
-      <div class="help-row"><span class="help-icon">👆</span>タップ：なし → 休日 → 早番 → なし の順で切替</div>
-      <div class="help-row"><span class="help-icon">👆👆</span>ダブルタップ：メモを編集</div>
+      <div class="help-row"><span class="help-icon">👆</span>タップ：メモを編集（休日・早番もここで切替）</div>
       <div class="help-row"><span class="help-icon">↔️</span>左右にスワイプ：前月・翌月へ移動</div>
       <div class="help-row"><span class="help-icon">🔒/✏️</span>ロック中は誤タップ防止。編集するときだけ✏️に切替</div>
     </div>
@@ -993,52 +992,17 @@ function renderInfoBar() {
 
 
 /* ================================================================
-   7. 日付セルのタップ／ダブルタップ処理
-      シングルタップ：なし→休日→早番→なし の順で切替
-      ダブルタップ  ：メモ編集モーダルを開く
-      ※ タイマーによる自前判定（300ms以内の2回目のタップをダブルタップ扱い）
+   7. 日付セルのタップ処理
+      タップ：メモ編集モーダルを開く（休日/早番はモーダル内のチェックボックスで切替）
+      ※ 以前あったダブルタップ判定は廃止し、タップ後の反応を待たせない
 ================================================================ */
-const DOUBLE_TAP_THRESHOLD_MS = 300;
-
 function attachDayCellTapHandler(cell, day) {
   cell.addEventListener("click", () => {
     if (isLocked) return; // ロック中は誤操作防止のため一切反応しない
-
-    const now = Date.now();
-    const lastTap = Number(cell.dataset.lastTap || 0);
-
-    if (now - lastTap < DOUBLE_TAP_THRESHOLD_MS) {
-      // 2回目のタップ＝ダブルタップとしてメモ編集を開く
-      cell.dataset.lastTap = "0";
-      openMemoModal(currentYear, currentMonth, day);
-    } else {
-      // 1回目のタップ。既定時間内に2回目が来なければシングルタップとして処理する
-      cell.dataset.lastTap = String(now);
-      setTimeout(() => {
-        if (Number(cell.dataset.lastTap) === now) {
-          cycleRestEarlyStatus(currentYear, currentMonth, day);
-        }
-      }, DOUBLE_TAP_THRESHOLD_MS);
-    }
+    openMemoModal(currentYear, currentMonth, day);
   });
 }
 
-/** シングルタップ時の状態遷移：なし → 休日 → 早番 → なし */
-function cycleRestEarlyStatus(year, month, day) {
-  const dateKeyStr = formatDateKey(year, month, day);
-  const entry = getEntry(dateKeyStr);
-
-  let rest = false, early = false;
-  if (!entry.rest && !entry.early) {
-    rest = true;             // なし → 休日
-  } else if (entry.rest) {
-    early = true;            // 休日 → 早番
-  }
-  // entry.early だった場合は rest=false, early=false のまま（＝早番 → なし）
-
-  setEntry(dateKeyStr, { ...entry, rest, early });
-  render();
-}
 
 
 /* ================================================================
