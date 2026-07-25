@@ -1,837 +1,1332 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+<meta charset="UTF-8">
+<!--
+  viewport-fit=cover        : iPhoneのノッチ／ホームバー領域まで背景を敷けるようにする
+  maximum-scale / user-scalable=no : ネイティブアプリのようにピンチ拡大・
+                                       ダブルタップ拡大を無効化し、
+                                       カレンダーのダブルタップ操作と競合しないようにする
+-->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>休日カレンダー</title>
+
+<!-- ホーム画面追加時のアイコン（既存ファイルをそのまま利用） -->
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>休日カレンダー</title>
+
+<!-- PWA（ホーム画面に追加してアプリのように使う）関連メタタグ -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="休日カレンダー">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#f2f2f7">
+
+<!-- manifest はファイルを増やさず、JS側でBlobとして動的生成してリンクする（1ファイル運用のため） -->
+<link rel="manifest" id="manifestLink">
+
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-  font-family: -apple-system, 'Helvetica Neue', sans-serif;
-  background: linear-gradient(180deg, #dfeafb 0%, #f7fbff 100%);
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 20px 12px 40px;
-  transition: background 0.3s;
-}
-body.editing {
-  background: linear-gradient(180deg, #ffe0b2 0%, #fff8f0 100%);
-}
-body.editing h1 { color: #e65100; }
-body.editing .card { box-shadow: 0 10px 28px rgba(255,120,0,0.22); }
-body.editing .days-grid { background: #ffd9a8; }
-body.editing .month-title { color: #e65100 !important; }
-body.editing .nav-btn { background: linear-gradient(180deg, #ffb74d 0%, #f57c00 100%); }
-h1 { color: #135fbd; font-size: 30px; letter-spacing: 2px; margin: 18px 0 18px; font-weight: 800; text-shadow: 0 2px 0 rgba(255,255,255,0.9); }
-.subtitle {
-  color: #555; font-size: 12px;
-  background: #fff8e1; border: 1px solid #ffe082;
-  border-radius: 6px; padding: 6px 14px;
-  margin-bottom: 16px; text-align: center;
+/* ================================================================
+   休日カレンダー / スタイル定義
+   ・iOSの純正カレンダーアプリを参考にした、白ベース・角丸・控えめな影のデザイン
+   ・画面全体にフィットさせ、スクロールなしで1ヶ月を表示することを最優先にしている
+================================================================ */
+
+/* ---- 色・サイズなどの基本トークン ---- */
+:root{
+  --color-bg:            #f2f2f7; /* 画面全体の背景（iOSのグループ背景相当） */
+  --color-card:          #ffffff; /* カレンダー本体・モーダルの背景 */
+  --color-border:        #e5e5ea; /* グリッド線・区切り線 */
+  --color-text:          #1c1c1e; /* 通常の文字色 */
+  --color-text-sub:       #8e8e93; /* 補助的な文字色（曜日見出し・情報バーなど） */
+  --color-sunday:        #ff3b30; /* 日曜・祝日の文字色 */
+  --color-saturday:      #007aff; /* 土曜の文字色 */
+  --color-today:         #ff3b30; /* 今日の丸印 */
+  --color-rest:          #007aff; /* 休日（休）のテーマカラー */
+  --color-rest-bg:       #e8f1ff; /* 休日セルの背景 */
+  --color-early:         #ff9500; /* 早番（早）のテーマカラー */
+  --color-early-bg:      #fff3e0; /* 早番セルの背景 */
+  --color-memo-time:     #007aff; /* メモの時間文字（青） */
+  --color-memo-text:     #1c1c1e; /* メモの内容文字（黒） */
+  --color-accent:        #ff9500; /* 編集モード中に画面を強調する色 */
+
+  /* 画面の縦横小さい方(vmin)を基準に文字サイズを決める。
+     こうすることで iPhone / iPad / PC のどの画面比率でも
+     UI全体が破綻せず一定の比率で拡大縮小する。 */
+  --base-font: clamp(13px, 2.05vmin, 19px);
 }
 
-/* ── Nav ── */
-.nav { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-.nav-btn {
-  background: linear-gradient(180deg, #35a8ff 0%, #0d5cff 100%); color: white; border: none;
-  border-radius: 50%; width: 38px; height: 38px;
-  font-size: 20px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2); transition: background 0.15s; flex-shrink: 0;
+/* ---- リセット ---- */
+*{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+html,body{
+  height:100%;
+  overscroll-behavior:none;      /* iOSのバウンススクロールで背景が見えるのを防ぐ */
 }
-.nav-btn:hover { filter: brightness(0.95); }
-.month-title { font-size: 24px; font-weight: 800; color: #135fbd; min-width: 150px; text-align: center; }
-.month-title.current { color: #E65100; }
+html{ font-size:var(--base-font); }
+body{
+  font-family:-apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Helvetica Neue", sans-serif;
+  background:var(--color-bg);
+  color:var(--color-text);
+  overflow:hidden;               /* ページ自体はスクロールさせない（1ヶ月を必ず収める） */
+  touch-action:manipulation;     /* ダブルタップでの拡大を抑止（メモ編集の誤動作防止） */
+  -webkit-touch-callout:none;
+}
+button{ font-family:inherit; }
 
-/* ── Calendar ── */
-.card {
-  background: white; border-radius: 22px;
-  box-shadow: 0 10px 28px rgba(47,128,255,0.18);
-  overflow: hidden; width: 100%; max-width: 900px;
-}
-.day-names { display: grid; grid-template-columns: repeat(7, 1fr); }
-.day-name {
-  text-align: center; padding: 8px 2px;
-  font-size: 12px; font-weight: bold;
-}
-.day-name.sun { color: #e60033; background: #ffe7f0; }
-.day-name.sat { color: #0a4db5; background: #b3d4ff; }
-.day-name.wkd { background: #dff1ff; color: #1f3b57; }
-
-.days-grid {
-  display: grid; grid-template-columns: repeat(7, 1fr);
-  gap: 3px; padding: 6px; background: #eaf4ff;
-}
-.day {
-  background: white; border-radius: 10px;
-  padding: 5px 3px 4px; font-size: 13px;
-  cursor: pointer; user-select: none;
-  min-height: 110px;
-  display: flex; flex-direction: column; align-items: stretch;
-  overflow: hidden; position: relative;
-  transition: filter 0.1s;
-}
-.day:hover:not(.empty) { filter: brightness(0.93); }
-.day.empty  { background: transparent; cursor: default; min-height: 110px; }
-.day.sun    { background: #FFF0F0; }
-.day.sat    { background: #cce3ff; }
-.day.holiday{ background: #FFE8E8; }
-.day.rest   { background: #e7f4ff !important; outline: 3px solid #35a8ff; outline-offset: -3px; }
-.day.early  { background: #fff3e0 !important; outline: 3px solid #ffa726; outline-offset: -3px; }
-.day.today  { background: #FFF9C4 !important; outline: 2px solid #F9A825; outline-offset: -2px; }
-.day.today .day-num { color: #E65100 !important; font-weight: 800; }
-
-/* top row: date number + 休 badge */
-.day-top {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 2px; margin-bottom: 3px;
-}
-.day-num { font-size: 20px; font-weight: 600; line-height: 1; }
-.day.sun .day-num, .day.holiday .day-num { color: #C00000; }
-.day.sat .day-num { color: #0a4db5; font-weight: 700; }
-.day.rest .day-num { color: #0d5cff; }
-.day.early .day-num { color: #e65100; }
-.rest-badge {
-  font-size: 9px; background: #0d5cff; color: white;
-  border-radius: 3px; padding: 1px 4px; font-weight: bold; line-height: 1.4;
-}
-.early-badge {
-  font-size: 9px; background: #ff9800; color: white;
-  border-radius: 3px; padding: 1px 4px; font-weight: bold; line-height: 1.4;
+/* ================================================================
+   全体レイアウト
+   header（操作バー）→ calendar-card（可変・残り全部）→ footer（情報＋操作）
+   の縦3段構成。calendar-card だけが flex:1 で余った高さを全部使う。
+================================================================ */
+.app{
+  height:100vh;
+  height:100dvh; /* 対応ブラウザではアドレスバーの増減に追従する高さを優先 */
+  display:flex;
+  flex-direction:column;
+  padding:
+    max(0.4rem, env(safe-area-inset-top))
+    max(0.4rem, env(safe-area-inset-right))
+    max(0.4rem, env(safe-area-inset-bottom))
+    max(0.4rem, env(safe-area-inset-left));
+  gap:0.4rem;
+  max-width:1200px;   /* PCの広い画面では自動的に横幅が広がるが、際限なく伸びないように上限を設定 */
+  width:100%;
+  margin:0 auto;
 }
 
-/* memo lines inside cell */
-.memo-list { display: flex; flex-direction: column; gap: 2px; }
-.memo-item {
-  background: #E3F2FD; border-radius: 3px;
-  padding: 1px 3px; overflow: hidden;
+/* ---- 上部操作バー（ロック/編集・月移動・今日・ヘルプ） ---- */
+.header{
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:0.35rem;
 }
-.day.rest .memo-item { background: #C8E6C9; }
-.day.early .memo-item { background: #FFE0B2; }
-.memo-time {
-  font-size: 11px; color: #1565C0; font-weight: bold;
-  line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.day.rest .memo-time { color: #2e7d32; }
-.day.early .memo-time { color: #e65100; }
-.memo-text {
-  font-size: 11px; color: #333; line-height: 1.2;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.more-badge { font-size: 8px; color: #888; text-align: center; margin-top: 1px; }
+body.editing .header{ color:var(--color-accent); }
 
-/* ── Mode bar ── */
-.mode-bar {
-  display: flex; gap: 8px; margin-bottom: 10px;
-  justify-content: center; width: 100%; max-width: 900px;
+/* ロック／編集の切替（セグメントコントロール） */
+.mode-segment{
+  display:flex;
+  background:var(--color-card);
+  border-radius:0.7rem;
+  padding:0.15rem;
+  box-shadow:0 1px 2px rgba(0,0,0,0.06);
+  flex:0 0 auto;
 }
-.mode-btn {
-  flex: 1; padding: 9px 10px; border: 2px solid #ddd;
-  border-radius: 10px; font-size: 13px; cursor: pointer;
-  font-family: inherit; background: white; color: #888;
-  transition: all 0.15s; font-weight: bold;
+.mode-segment button{
+  border:none;
+  background:transparent;
+  color:var(--color-text-sub);
+  font-size:0.85rem;
+  font-weight:600;
+  padding:0.35rem 0.55rem;
+  border-radius:0.55rem;
+  cursor:pointer;
+  line-height:1;
+  white-space:nowrap;
 }
-.mode-btn.active-rest { background: #e3f2fd; border-color: #2f80ff; color: #135fbd; }
-.mode-btn.active-memo { background: #fff7d6; border-color: #ffd400; color: #8a6500; }
-.mode-btn.active-edit { background: #fff3e0; border-color: #ff9800; color: #e65100; font-weight: bold; }
-body.rest-mode .days-grid .day:not(.empty) { cursor: cell; }
-body.rest-mode .days-grid .day:not(.empty):hover { filter: brightness(0.88); }
+.mode-segment button.active{ background:var(--color-rest-bg); color:var(--color-rest); }
+.mode-segment button.active.is-edit{ background:var(--color-early-bg); color:var(--color-early); }
 
-/* ── Legend ── */
-.legend {
-  display: flex; justify-content: center; flex-wrap: wrap;
-  gap: 12px; margin: 12px 0 4px; font-size: 11px;
+/* 月移動ナビゲーション */
+.nav{
+  flex:1 1 auto;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:0.3rem;
+  min-width:0;
 }
-.legend-item { display: flex; align-items: center; gap: 5px; color: #555; }
-.legend-box { width: 14px; height: 14px; border: 1px solid #bbb; border-radius: 3px; }
+.nav-btn{
+  flex:0 0 auto;
+  width:1.9rem; height:1.9rem;
+  border:none; border-radius:50%;
+  background:var(--color-card);
+  color:var(--color-rest);
+  font-size:1.05rem;
+  font-weight:700;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer;
+  box-shadow:0 1px 2px rgba(0,0,0,0.06);
+}
+.month-title{
+  font-size:1rem;
+  font-weight:700;
+  min-width:0;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  text-align:center;
+  padding:0 0.2rem;
+}
+.month-title.current{ color:var(--color-today); }
 
-/* ── Info & Buttons ── */
-.info-bar {
-  margin: 8px 0 3px; color: #375623;
-  font-size: 12px; font-weight: bold;
-  min-height: 18px; text-align: center;
+/* 右側：今日ボタン・ヘルプボタン */
+.header-right{ flex:0 0 auto; display:flex; align-items:center; gap:0.3rem; }
+.today-btn{
+  border:none; border-radius:0.7rem;
+  background:var(--color-card);
+  color:var(--color-rest);
+  font-size:0.8rem; font-weight:700;
+  padding:0.4rem 0.6rem;
+  cursor:pointer;
+  box-shadow:0 1px 2px rgba(0,0,0,0.06);
+  white-space:nowrap;
 }
-.buttons { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; justify-content: center; }
-.btn {
-  padding: 9px 16px; border: none; border-radius: 8px;
-  font-size: 13px; cursor: pointer; font-family: inherit;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
-.btn-print  { background: #2E75B6; color: white; }
-.btn-print:hover  { background: #1F5480; }
-.btn-reset  { background: #888; color: white; }
-.btn-reset:hover  { background: #666; }
-.btn-hide   { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
-.btn-hide:hover   { background: #ffe0b2; }
-.btn-manage { background: #f3e5f5; color: #6a1b9a; border: 1px solid #ce93d8; }
-.btn-manage:hover { background: #e1bee7; }
-.btn-lock   { background: #e3f2fd; color: #135fbd; border: 1px solid #8ecbff; }
-.btn-lock:hover   { background: #c8e6c9; }
-.btn-lock.locked  { background: #fce4ec; color: #c62828; border: 1px solid #ef9a9a; }
-.btn-lock.locked:hover { background: #ffcdd2; }
-.mode-bar.locked .mode-btn { opacity: 0.4; pointer-events: none; }
-
-/* ── Modal (共通) ── */
-.overlay {
-  display: none; position: fixed; inset: 0;
-  background: rgba(0,0,0,0.45); z-index: 100;
-  align-items: center; justify-content: center;
-  padding: 16px;
-}
-.overlay.show { display: flex; }
-.modal {
-  background: white; border-radius: 14px;
-  padding: 20px 22px; width: 100%; max-width: 340px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.22);
-  max-height: 90vh; overflow-y: auto;
-}
-.modal h2 { color: #2E75B6; font-size: 15px; margin-bottom: 14px; text-align: center; }
-.modal-rest {
-  display: flex; align-items: center; gap: 10px;
-  font-size: 14px; margin-bottom: 14px; cursor: pointer;
-}
-.modal-rest input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: #4CAF50; }
-#chkEarly { accent-color: #ff9800; }
-
-.memo-section-title {
-  font-size: 12px; color: #888; font-weight: bold;
-  margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 4px;
-}
-.memo-entries { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
-.memo-entry {
-  display: flex; gap: 6px; align-items: center;
-  background: #f8f9fa; border-radius: 8px; padding: 8px 10px;
-}
-.memo-entry input[type="time"] {
-  width: 90px; border: 1px solid #ddd; border-radius: 6px;
-  padding: 5px 6px; font-size: 13px; font-family: inherit; outline: none; flex-shrink: 0;
-}
-.memo-entry input[type="time"]:focus { border-color: #2E75B6; }
-.memo-entry input[type="text"] {
-  flex: 1; border: 1px solid #ddd; border-radius: 6px;
-  padding: 5px 8px; font-size: 13px; font-family: inherit; outline: none; min-width: 0;
-}
-.memo-entry input[type="text"]:focus { border-color: #2E75B6; }
-.memo-entry input[type="text"]::placeholder { color: #bbb; }
-.del-memo-btn {
-  background: none; border: none; cursor: pointer;
-  color: #ccc; font-size: 18px; line-height: 1; padding: 0 2px; flex-shrink: 0;
-}
-.del-memo-btn:hover { color: #e53935; }
-.add-memo-btn {
-  width: 100%; padding: 8px; border: 2px dashed #ccc;
-  border-radius: 8px; background: none; color: #888;
-  font-size: 13px; cursor: pointer; font-family: inherit; transition: all 0.15s;
-}
-.add-memo-btn:hover { border-color: #2E75B6; color: #2E75B6; background: #f0f7ff; }
-
-.modal-btns { display: flex; gap: 10px; margin-top: 14px; }
-.modal-btns button {
-  flex: 1; padding: 9px; border: none;
-  border-radius: 7px; font-size: 13px; cursor: pointer; font-family: inherit;
-}
-.m-save   { background: #2E75B6; color: white; }
-.m-save:hover   { background: #1F5480; }
-.m-cancel { background: #eee; color: #555; }
-.m-cancel:hover { background: #ddd; }
-.m-del-all {
-  width: 100%; padding: 7px; border: none; border-radius: 7px;
-  cursor: pointer; background: #f5f5f5; color: #aaa;
-  font-size: 11px; margin-top: 8px; font-family: inherit;
-}
-.m-del-all:hover { background: #ffe0e0; color: #c00; }
-
-/* 隠した月の管理モーダル */
-.hidden-list { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
-.hidden-item {
-  display: flex; align-items: center; justify-content: space-between;
-  background: #fff3e0; border-radius: 8px; padding: 10px 14px;
-  font-size: 14px; color: #555;
-}
-.restore-btn {
-  background: #4CAF50; color: white; border: none;
-  border-radius: 6px; padding: 5px 12px; font-size: 12px;
-  cursor: pointer; font-family: inherit;
-}
-.restore-btn:hover { background: #388e3c; }
-.empty-hidden { text-align: center; color: #aaa; font-size: 13px; padding: 20px 0; }
-
-@media print {
-  body { background: white; padding: 5px; }
-  .buttons, .subtitle, .legend, .info-bar, .overlay, .nav, .mode-bar { display: none !important; }
-  .card { box-shadow: none; border: 1px solid #ccc; max-width: 100%; }
-  h1 { margin-bottom: 8px; }
+.help-btn{
+  width:1.9rem; height:1.9rem;
+  border:none; border-radius:50%;
+  background:var(--color-card);
+  color:var(--color-text-sub);
+  font-size:0.9rem; font-weight:700;
+  cursor:pointer;
+  box-shadow:0 1px 2px rgba(0,0,0,0.06);
 }
 
-@media (max-width: 560px) {
-  body { padding: 16px 8px 32px; }
-  h1 { font-size: 26px; margin-top: 12px; }
-  .mode-bar { gap: 6px; }
-  .mode-btn { font-size: 12px; padding: 9px 6px; }
-  .day { min-height: 68px; }
+/* ================================================================
+   カレンダー本体
+================================================================ */
+.calendar-card{
+  flex:1 1 auto;
+  min-height:0;               /* Safariのflex縮小バグ対策（これが無いと縦にはみ出す） */
+  display:flex;
+  flex-direction:column;
+  background:var(--color-card);
+  border-radius:1rem;
+  box-shadow:0 1px 4px rgba(0,0,0,0.08);
+  overflow:hidden;
 }
 
+/* 曜日見出し行（高さ固定） */
+.day-names{
+  flex:0 0 auto;
+  display:grid;
+  grid-template-columns:repeat(7, 1fr);
+  border-bottom:1px solid var(--color-border);
+}
+.day-name{
+  text-align:center;
+  padding:0.45rem 0.1rem;
+  font-size:0.72rem;
+  font-weight:700;
+  color:var(--color-text-sub);
+}
+.day-name.sun{ color:var(--color-sunday); }
+.day-name.sat{ color:var(--color-saturday); }
+
+/* 日付グリッド本体：残り高さをすべて使い、週数ぶんの行を"均等割り"にする。
+   → grid-template-rows は render() 実行時にその月の週数に応じて
+      JSから repeat(週数, 1fr) を指定する。min-height は一切使わない。
+      これにより「1行目だけ縦長になる」不具合や、週によって高さが
+      バラつく不具合を防いでいる。 */
+.days-grid{
+  flex:1 1 auto;
+  min-height:0;                 /* 同じくSafariのflex縮小バグ対策 */
+  display:grid;
+  grid-template-columns:repeat(7, 1fr);
+  gap:1px;
+  background:var(--color-border); /* gapに背景色を敷いてグリッド線に見せる */
+}
+
+/* 日付1マス */
+.day{
+  background:var(--color-card);
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  min-height:0;                 /* 高さはgridの1frが決める。ここでmin-heightは指定しない */
+  padding:0.2rem 0.25rem;
+  overflow:hidden;
+  cursor:pointer;
+  user-select:none;
+  position:relative;
+}
+.day.empty{ cursor:default; }
+.day.sun{ background:#fff2f1; }
+.day.sat{ background:#eef6ff; }
+.day.holiday{ background:#fff2f1; }
+.day.rest{ background:var(--color-rest-bg); }
+.day.early{ background:var(--color-early-bg); }
+body.locked .day:not(.empty):active{ filter:none; }
+body:not(.locked) .day:not(.empty):active{ filter:brightness(0.94); }
+
+/* 日付セルの1行目：日付数字 + 休/早バッジ */
+.day-top{
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:0.15rem;
+}
+.day-num{
+  font-size:0.85rem;
+  font-weight:600;
+  line-height:1.7;
+  width:1.7em;
+  height:1.7em;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:50%;
+  flex:0 0 auto;
+}
+.day.sun .day-num,
+.day.holiday .day-num{ color:var(--color-sunday); }
+.day.sat .day-num{ color:var(--color-saturday); }
+.day.rest .day-num{ color:var(--color-rest); }
+.day.early .day-num{ color:var(--color-early); }
+/* 今日は丸い色つきバッジで強調（Appleカレンダー風） */
+.day.today .day-num{
+  background:var(--color-today);
+  color:#fff !important;
+  font-weight:700;
+}
+
+.day-badge{
+  font-size:0.6rem;
+  font-weight:700;
+  color:#fff;
+  border-radius:0.3rem;
+  padding:0.05rem 0.3rem;
+  line-height:1.5;
+  flex:0 0 auto;
+}
+.day-badge.rest{ background:var(--color-rest); }
+.day-badge.early{ background:var(--color-early); }
+
+/* メモ一覧 */
+.memo-list{
+  flex:1 1 auto;
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+  gap:0.1rem;
+  overflow:hidden;
+  margin-top:0.1rem;
+}
+.memo-item{ line-height:1.25; overflow:hidden; }
+.memo-time{
+  font-size:0.62rem;
+  font-weight:700;
+  color:var(--color-memo-time);   /* 時間は青文字 */
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.memo-text{
+  font-size:0.62rem;
+  color:var(--color-memo-text);   /* 内容は黒文字 */
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.memo-more{
+  font-size:0.58rem;
+  color:var(--color-text-sub);
+}
+
+/* ================================================================
+   下部バー（この月の集計・古い月の消去・月のリセット）
+================================================================ */
+.footer{
+  flex:0 0 auto;
+  display:flex;
+  flex-direction:column;
+  gap:0.25rem;
+}
+.info-bar{
+  text-align:center;
+  font-size:0.68rem;
+  color:var(--color-text-sub);
+  min-height:1em;
+}
+.footer-buttons{
+  display:flex;
+  gap:0.4rem;
+}
+.footer-btn{
+  flex:1 1 0;
+  border:none;
+  border-radius:0.7rem;
+  background:var(--color-card);
+  color:var(--color-text-sub);
+  font-size:0.72rem;
+  font-weight:600;
+  padding:0.45rem 0.3rem;
+  cursor:pointer;
+  box-shadow:0 1px 2px rgba(0,0,0,0.06);
+}
+
+/* ================================================================
+   モーダル共通（メモ編集・ヘルプ）
+================================================================ */
+.overlay{
+  display:none;
+  position:fixed; inset:0;
+  background:rgba(0,0,0,0.4);
+  align-items:center; justify-content:center;
+  padding:1rem;
+  z-index:100;
+}
+.overlay.show{ display:flex; }
+.modal{
+  background:var(--color-card);
+  border-radius:1rem;
+  width:100%; max-width:22rem;
+  max-height:88vh;
+  overflow-y:auto;
+  padding:1.1rem 1.2rem;
+  box-shadow:0 10px 30px rgba(0,0,0,0.25);
+}
+.modal h2{
+  font-size:0.95rem;
+  text-align:center;
+  margin-bottom:0.8rem;
+  color:var(--color-text);
+}
+.modal-toggle-row{ display:flex; gap:0.6rem; margin-bottom:0.7rem; }
+.modal-toggle{
+  flex:1;
+  display:flex; align-items:center; justify-content:center; gap:0.4rem;
+  font-size:0.8rem; font-weight:600;
+  padding:0.55rem 0.3rem;
+  border-radius:0.6rem;
+  border:1.5px solid var(--color-border);
+  cursor:pointer;
+  color:var(--color-text-sub);
+}
+.modal-toggle input{ width:1rem; height:1rem; accent-color:var(--color-rest); flex:0 0 auto; }
+.modal-toggle.rest-toggle.checked{ border-color:var(--color-rest); background:var(--color-rest-bg); color:var(--color-rest); }
+.modal-toggle.early-toggle input{ accent-color:var(--color-early); }
+.modal-toggle.early-toggle.checked{ border-color:var(--color-early); background:var(--color-early-bg); color:var(--color-early); }
+
+.memo-section-title{
+  font-size:0.72rem; color:var(--color-text-sub); font-weight:700;
+  margin-bottom:0.5rem; padding-bottom:0.3rem; border-bottom:1px solid var(--color-border);
+}
+.memo-entries{ display:flex; flex-direction:column; gap:0.5rem; margin-bottom:0.6rem; }
+.memo-entry{
+  display:flex; align-items:center; gap:0.4rem;
+  background:#f7f7f9; border-radius:0.6rem; padding:0.4rem 0.5rem;
+}
+.memo-entry input[type="time"]{
+  width:5.6rem; flex:0 0 auto;
+  border:1px solid var(--color-border); border-radius:0.4rem;
+  padding:0.3rem 0.35rem; font-size:0.78rem; font-family:inherit; outline:none;
+}
+.memo-entry input[type="text"]{
+  flex:1; min-width:0;
+  border:1px solid var(--color-border); border-radius:0.4rem;
+  padding:0.3rem 0.5rem; font-size:0.78rem; font-family:inherit; outline:none;
+}
+.memo-entry input:focus{ border-color:var(--color-rest); }
+.memo-del-btn{
+  flex:0 0 auto; background:none; border:none; cursor:pointer;
+  color:#c7c7cc; font-size:1.1rem; line-height:1; padding:0 0.15rem;
+}
+.memo-add-btn{
+  width:100%; padding:0.5rem; border:1.5px dashed var(--color-border);
+  border-radius:0.6rem; background:none; color:var(--color-text-sub);
+  font-size:0.78rem; cursor:pointer; font-family:inherit;
+}
+.modal-btns{ display:flex; gap:0.6rem; margin-top:0.8rem; }
+.modal-btns button{
+  flex:1; padding:0.55rem; border:none; border-radius:0.6rem;
+  font-size:0.8rem; font-weight:700; cursor:pointer; font-family:inherit;
+}
+.btn-save{ background:var(--color-rest); color:#fff; }
+.btn-cancel{ background:#eeeef0; color:var(--color-text-sub); }
+.btn-delete-entry{
+  width:100%; margin-top:0.5rem; padding:0.45rem;
+  border:none; border-radius:0.6rem; background:none;
+  color:#c7c7cc; font-size:0.7rem; cursor:pointer; font-family:inherit;
+}
+.btn-delete-entry:active{ color:#ff3b30; }
+
+.help-list{ display:flex; flex-direction:column; gap:0.6rem; margin-bottom:0.9rem; }
+.help-row{ display:flex; align-items:center; gap:0.6rem; font-size:0.8rem; }
+.help-icon{ flex:0 0 auto; font-size:1.1rem; width:1.6rem; text-align:center; }
 </style>
 </head>
-<body>
+<body class="locked">
 
-<!-- タイトル削除 -->
+<div class="app">
 
-<div class="nav" style="justify-content:center">
-  <div class="month-title" id="monthTitle"></div>
-  <button onclick="goToday()" style="
-    background:linear-gradient(180deg,#ff9800,#e65100);
-    color:white;border:none;border-radius:20px;
-    padding:6px 14px;font-size:12px;font-weight:bold;
-    cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.2);
-    font-family:inherit;margin-left:10px;
-  ">今月</button>
+  <!-- ─────────────────────────────────────────
+       ① 上部操作バー：ロック/編集切替・月移動・今日・ヘルプ
+  ───────────────────────────────────────── -->
+  <div class="header">
+    <div class="mode-segment">
+      <button id="lockModeBtn" class="active" title="ロックモード">🔒</button>
+      <button id="editModeBtn" class="is-edit" title="編集モード">✏️</button>
+    </div>
+
+    <div class="nav">
+      <button class="nav-btn" id="prevBtn" aria-label="前の月">‹</button>
+      <div class="month-title" id="monthTitle"></div>
+      <button class="nav-btn" id="nextBtn" aria-label="次の月">›</button>
+    </div>
+
+    <div class="header-right">
+      <button class="today-btn" id="todayBtn">今日</button>
+      <button class="help-btn" id="helpBtn" aria-label="使い方">?</button>
+    </div>
+  </div>
+
+  <!-- ─────────────────────────────────────────
+       ② カレンダー本体（残り高さをすべて使用）
+  ───────────────────────────────────────── -->
+  <div class="calendar-card">
+    <div class="day-names" id="dayNames"></div>
+    <div class="days-grid" id="daysGrid"></div>
+  </div>
+
+  <!-- ─────────────────────────────────────────
+       ③ 下部バー：この月の集計・古い月の消去・リセット
+  ───────────────────────────────────────── -->
+  <div class="footer">
+    <div class="info-bar" id="infoBar"></div>
+    <div class="footer-buttons">
+      <button class="footer-btn" id="deleteOldBtn">🗑️ 古い月を消去</button>
+      <button class="footer-btn" id="resetMonthBtn">↩️ この月をリセット</button>
+    </div>
+  </div>
+
 </div>
 
-<div class="mode-bar">
-  <button class="mode-btn" id="editBtn">✏️ 編集</button>
-  <button class="mode-btn active-rest" id="lockBtn">🔒 ロック</button>
-</div>
-
-<div class="card">
-  <div class="day-names" id="dayNames"></div>
-  <div class="days-grid" id="daysGrid"></div>
-</div>
-
-
-<div class="info-bar" id="infoBar"></div>
-
-<div class="buttons">
-  
-  <button class="btn btn-hide"   onclick="deleteOldMonths()">🗑️ 古い月を消去</button>
-  <button class="btn btn-reset"  onclick="resetAll()">↩️ リセット</button>
-</div>
-
-<div style="
-max-width:560px;
-width:100%;
-margin-top:18px;
-padding:16px;
-background:white;
-border:1px solid #d7e6ff;
-border-radius:14px;
-display:flex;
-justify-content:space-around;
-font-size:14px;
-font-weight:600;
-color:#444;">
-<div>🔵 タップ：なし→休日→早番→なし</div>
-<div>🟢 ダブルタップ：メモ編集</div>
-</div>
-
-<!-- メモ編集モーダル -->
-<div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
+<!-- ─────────────────────────────────────────
+     メモ編集モーダル
+───────────────────────────────────────── -->
+<div class="overlay" id="modalOverlay">
   <div class="modal">
     <h2 id="modalTitle"></h2>
-    <label class="modal-rest">
-      <input type="checkbox" id="chkRest"> 休日にする
-    </label>
-    <label class="modal-rest">
-      <input type="checkbox" id="chkEarly"> 早番にする
-    </label>
+
+    <div class="modal-toggle-row">
+      <label class="modal-toggle rest-toggle" id="restToggleLabel">
+        <input type="checkbox" id="chkRest"> 休日
+      </label>
+      <label class="modal-toggle early-toggle" id="earlyToggleLabel">
+        <input type="checkbox" id="chkEarly"> 早番
+      </label>
+    </div>
+
     <div class="memo-section-title">📝 メモ（時間と内容）</div>
     <div class="memo-entries" id="memoEntries"></div>
-    <button class="add-memo-btn" onclick="addMemoRow()">＋ メモを追加</button>
+    <button class="memo-add-btn" id="addMemoBtn" type="button">＋ メモを追加</button>
+
     <div class="modal-btns">
-      <button class="m-cancel" onclick="closeModal()">キャンセル</button>
-      <button class="m-save"   onclick="saveModal()">保存</button>
+      <button class="btn-cancel" id="modalCancelBtn" type="button">キャンセル</button>
+      <button class="btn-save" id="modalSaveBtn" type="button">保存</button>
     </div>
-    <button class="m-del-all" onclick="deleteEntry()">この日の設定をすべて削除</button>
+    <button class="btn-delete-entry" id="modalDeleteBtn" type="button">この日の設定をすべて削除</button>
   </div>
 </div>
 
+<!-- ─────────────────────────────────────────
+     使い方（ヘルプ）モーダル
+───────────────────────────────────────── -->
+<div class="overlay" id="helpOverlay">
+  <div class="modal">
+    <h2>使い方</h2>
+    <div class="help-list">
+      <div class="help-row"><span class="help-icon">👆</span>タップ：なし → 休日 → 早番 → なし の順で切替</div>
+      <div class="help-row"><span class="help-icon">👆👆</span>ダブルタップ：メモを編集</div>
+      <div class="help-row"><span class="help-icon">↔️</span>左右にスワイプ：前月・翌月へ移動</div>
+      <div class="help-row"><span class="help-icon">🔒/✏️</span>ロック中は誤タップ防止。編集するときだけ✏️に切替</div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-save" id="helpCloseBtn" type="button">閉じる</button>
+    </div>
+  </div>
+</div>
 
 <script>
-/* ── 祝日データ（2024〜2027年） ── */
-const HOLIDAYS = {
+"use strict";
+/* ================================================================
+   休日カレンダー / アプリ本体スクリプト
+   構成：
+     1. PWA用マニフェストの動的生成
+     2. 祝日データ（固定データ＋計算ロジック）
+     3. 状態管理（グローバル変数）
+     4. 日付ユーティリティ
+     5. データの保存・読込（localStorage）
+     6. カレンダー描画（render）
+     7. 日付セルのタップ／ダブルタップ処理
+     8. メモ編集モーダル
+     9. 月移動・今日へ戻る・古い月の消去・月のリセット
+    10. ロック／編集モードの切替
+    11. スワイプ・トラックパッド・キーボード操作
+    12. 初期化
+================================================================ */
+
+
+/* ================================================================
+   1. PWA用マニフェストの動的生成
+      1ファイル運用のため、manifest.jsonを別ファイルにせず
+      JS側でBlobとして生成し <link rel="manifest"> に差し込む。
+================================================================ */
+(function setupManifest() {
+  const manifest = {
+    name: "休日カレンダー",
+    short_name: "休日カレンダー",
+    start_url: ".",
+    display: "standalone",
+    background_color: "#f2f2f7",
+    theme_color: "#f2f2f7",
+    icons: [
+      { src: "icon-192.png", sizes: "192x192", type: "image/png" },
+      { src: "apple-touch-icon.png", sizes: "180x180", type: "image/png" }
+    ]
+  };
+  const blob = new Blob([JSON.stringify(manifest)], { type: "application/json" });
+  document.getElementById("manifestLink").setAttribute("href", URL.createObjectURL(blob));
+})();
+
+
+/* ================================================================
+   2. 祝日データ
+      ・2024〜2027年は固定データを直接持つ（内閣府発表の確定値）
+      ・それ以外の年は計算式（ハッピーマンデー・春分/秋分の近似式）で算出する
+      ・データ形式や関数名は変更しても、呼び出し側からは
+        holidayName(dateKey) という1関数だけを使う
+================================================================ */
+const FIXED_HOLIDAYS = {
   /* 2024 */
-  '2024-01-01':'元日','2024-01-08':'成人の日',
-  '2024-02-11':'建国記念の日','2024-02-12':'振替休日','2024-02-23':'天皇誕生日',
-  '2024-03-20':'春分の日',
-  '2024-04-29':'昭和の日',
-  '2024-05-03':'憲法記念日','2024-05-04':'みどりの日','2024-05-05':'こどもの日','2024-05-06':'振替休日',
-  '2024-07-15':'海の日','2024-08-11':'山の日','2024-08-12':'振替休日',
-  '2024-09-16':'敬老の日','2024-09-22':'秋分の日','2024-09-23':'振替休日',
-  '2024-10-14':'スポーツの日',
-  '2024-11-03':'文化の日','2024-11-04':'振替休日','2024-11-23':'勤労感謝の日',
+  "2024-01-01":"元日","2024-01-08":"成人の日",
+  "2024-02-11":"建国記念の日","2024-02-12":"振替休日","2024-02-23":"天皇誕生日",
+  "2024-03-20":"春分の日",
+  "2024-04-29":"昭和の日",
+  "2024-05-03":"憲法記念日","2024-05-04":"みどりの日","2024-05-05":"こどもの日","2024-05-06":"振替休日",
+  "2024-07-15":"海の日","2024-08-11":"山の日","2024-08-12":"振替休日",
+  "2024-09-16":"敬老の日","2024-09-22":"秋分の日","2024-09-23":"振替休日",
+  "2024-10-14":"スポーツの日",
+  "2024-11-03":"文化の日","2024-11-04":"振替休日","2024-11-23":"勤労感謝の日",
   /* 2025 */
-  '2025-01-01':'元日','2025-01-13':'成人の日',
-  '2025-02-11':'建国記念の日','2025-02-23':'天皇誕生日','2025-02-24':'振替休日',
-  '2025-03-20':'春分の日',
-  '2025-04-29':'昭和の日',
-  '2025-05-03':'憲法記念日','2025-05-04':'みどりの日','2025-05-05':'こどもの日','2025-05-06':'振替休日',
-  '2025-07-21':'海の日','2025-08-11':'山の日',
-  '2025-09-15':'敬老の日','2025-09-23':'秋分の日',
-  '2025-10-13':'スポーツの日',
-  '2025-11-03':'文化の日','2025-11-23':'勤労感謝の日','2025-11-24':'振替休日',
+  "2025-01-01":"元日","2025-01-13":"成人の日",
+  "2025-02-11":"建国記念の日","2025-02-23":"天皇誕生日","2025-02-24":"振替休日",
+  "2025-03-20":"春分の日",
+  "2025-04-29":"昭和の日",
+  "2025-05-03":"憲法記念日","2025-05-04":"みどりの日","2025-05-05":"こどもの日","2025-05-06":"振替休日",
+  "2025-07-21":"海の日","2025-08-11":"山の日",
+  "2025-09-15":"敬老の日","2025-09-23":"秋分の日",
+  "2025-10-13":"スポーツの日",
+  "2025-11-03":"文化の日","2025-11-23":"勤労感謝の日","2025-11-24":"振替休日",
   /* 2026 */
-  '2026-01-01':'元日','2026-01-12':'成人の日',
-  '2026-02-11':'建国記念の日','2026-02-23':'天皇誕生日',
-  '2026-03-20':'春分の日',
-  '2026-04-29':'昭和の日',
-  '2026-05-03':'憲法記念日','2026-05-04':'みどりの日','2026-05-05':'こどもの日','2026-05-06':'振替休日',
-  '2026-07-20':'海の日','2026-08-11':'山の日',
-  '2026-09-21':'敬老の日','2026-09-22':'国民の休日','2026-09-23':'秋分の日',
-  '2026-10-12':'スポーツの日',
-  '2026-11-03':'文化の日','2026-11-23':'勤労感謝の日',
+  "2026-01-01":"元日","2026-01-12":"成人の日",
+  "2026-02-11":"建国記念の日","2026-02-23":"天皇誕生日",
+  "2026-03-20":"春分の日",
+  "2026-04-29":"昭和の日",
+  "2026-05-03":"憲法記念日","2026-05-04":"みどりの日","2026-05-05":"こどもの日","2026-05-06":"振替休日",
+  "2026-07-20":"海の日","2026-08-11":"山の日",
+  "2026-09-21":"敬老の日","2026-09-22":"国民の休日","2026-09-23":"秋分の日",
+  "2026-10-12":"スポーツの日",
+  "2026-11-03":"文化の日","2026-11-23":"勤労感謝の日",
   /* 2027 */
-  '2027-01-01':'元日','2027-01-11':'成人の日',
-  '2027-02-11':'建国記念の日','2027-02-23':'天皇誕生日',
-  '2027-03-21':'春分の日',
-  '2027-04-29':'昭和の日',
-  '2027-05-03':'憲法記念日','2027-05-04':'みどりの日','2027-05-05':'こどもの日',
-  '2027-07-19':'海の日','2027-08-11':'山の日',
-  '2027-09-20':'敬老の日','2027-09-23':'秋分の日',
-  '2027-10-11':'スポーツの日',
-  '2027-11-03':'文化の日','2027-11-23':'勤労感謝の日',
+  "2027-01-01":"元日","2027-01-11":"成人の日",
+  "2027-02-11":"建国記念の日","2027-02-23":"天皇誕生日",
+  "2027-03-21":"春分の日",
+  "2027-04-29":"昭和の日",
+  "2027-05-03":"憲法記念日","2027-05-04":"みどりの日","2027-05-05":"こどもの日",
+  "2027-07-19":"海の日","2027-08-11":"山の日",
+  "2027-09-20":"敬老の日","2027-09-23":"秋分の日",
+  "2027-10-11":"スポーツの日",
+  "2027-11-03":"文化の日","2027-11-23":"勤労感謝の日"
 };
 
-const MONTH_NAMES = ['','1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
-const DAY_NAMES   = ['日','月','火','水','木','金','土'];
-const MAX_DISPLAY = 3;
+// 計算結果をキャッシュして、同じ年を何度も計算しないようにする
+const calculatedHolidayCache = {};
 
-const todayDate = new Date();
-let curYear  = todayDate.getFullYear();
-let curMonth = todayDate.getMonth() + 1;
-let currentKey  = null;
-let isLocked    = true;
-
-/* データ形式: { 'YYYY-MM-DD': { rest: bool, memos: [{time, text}] } } */
-let data = JSON.parse(localStorage.getItem('calData') || '{}');
-/* 遡れる最古の月 "YYYY-MM"（消去済み境界） */
-let earliestYM = localStorage.getItem('calEarliest') || null;
-
-/* ── 保存 ── */
-function save() { localStorage.setItem('calData', JSON.stringify(data)); }
-function saveEarliest() { localStorage.setItem('calEarliest', earliestYM); }
-function dateKey(y, m, d) {
-  return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-}
-function monthKey(y, m) { return `${y}-${String(m).padStart(2,'0')}`; }
-
-function nthMonday(year, month, nth) {
+/** その年の「第nthMonday(第n月曜日)」の日付(1〜31)を返す */
+function findNthMonday(year, month, nth) {
   let count = 0;
-  for (let d = 1; d <= 31; d++) {
-    const date = new Date(year, month - 1, d);
-    if (date.getMonth() !== month - 1) break;
-    if (date.getDay() === 1 && ++count === nth) return d;
+  for (let day = 1; day <= 31; day++) {
+    const date = new Date(year, month - 1, day);
+    if (date.getMonth() !== month - 1) break; // 月をまたいだら終了
+    if (date.getDay() === 1 && ++count === nth) return day;
   }
   return null;
 }
 
-function equinoxDay(year, type) {
-  if (type === 'spring') return Math.floor(20.8431 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
-  return Math.floor(23.2488 + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+/** 春分の日・秋分の日を近似式で計算する（国立天文台の計算式に基づく近似） */
+function findEquinoxDay(year, type) {
+  const base = type === "spring" ? 20.8431 : 23.2488;
+  return Math.floor(base + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
 }
 
-function getYearHolidays(year) {
+/** 固定データが無い年について、祝日一覧を計算して { "YYYY-MM-DD": 名称 } の形で返す */
+function calculateYearHolidays(year) {
+  if (calculatedHolidayCache[year]) return calculatedHolidayCache[year];
+
   const result = {};
-  const add = (m, d, name) => { result[dateKey(year, m, d)] = name; };
+  const set = (month, day, name) => { result[formatDateKey(year, month, day)] = name; };
 
-  add(1, 1, '元日');
-  add(1, nthMonday(year, 1, 2), '成人の日');
-  add(2, 11, '建国記念の日');
-  add(2, 23, '天皇誕生日');
-  add(3, equinoxDay(year, 'spring'), '春分の日');
-  add(4, 29, '昭和の日');
-  add(5, 3, '憲法記念日');
-  add(5, 4, 'みどりの日');
-  add(5, 5, 'こどもの日');
-  add(7, nthMonday(year, 7, 3), '海の日');
-  add(8, 11, '山の日');
-  add(9, nthMonday(year, 9, 3), '敬老の日');
-  add(9, equinoxDay(year, 'autumn'), '秋分の日');
-  add(10, nthMonday(year, 10, 2), 'スポーツの日');
-  add(11, 3, '文化の日');
-  add(11, 23, '勤労感謝の日');
+  set(1, 1, "元日");
+  set(1, findNthMonday(year, 1, 2), "成人の日");
+  set(2, 11, "建国記念の日");
+  set(2, 23, "天皇誕生日");
+  set(3, findEquinoxDay(year, "spring"), "春分の日");
+  set(4, 29, "昭和の日");
+  set(5, 3, "憲法記念日");
+  set(5, 4, "みどりの日");
+  set(5, 5, "こどもの日");
+  set(7, findNthMonday(year, 7, 3), "海の日");
+  set(8, 11, "山の日");
+  set(9, findNthMonday(year, 9, 3), "敬老の日");
+  set(9, findEquinoxDay(year, "autumn"), "秋分の日");
+  set(10, findNthMonday(year, 10, 2), "スポーツの日");
+  set(11, 3, "文化の日");
+  set(11, 23, "勤労感謝の日");
 
-  Object.keys(result).sort().forEach(k => {
-    const dt = new Date(k + 'T00:00:00');
-    if (dt.getDay() !== 0) return;
-    const sub = new Date(dt);
-    do sub.setDate(sub.getDate() + 1);
-    while (result[dateKey(sub.getFullYear(), sub.getMonth() + 1, sub.getDate())]);
-    if (sub.getFullYear() === year) result[dateKey(year, sub.getMonth() + 1, sub.getDate())] = '振替休日';
+  // 振替休日：祝日が日曜のとき、その直後の平日（まだ祝日でない日）を振替休日にする
+  Object.keys(result).sort().forEach((key) => {
+    const date = new Date(key + "T00:00:00");
+    if (date.getDay() !== 0) return;
+    const next = new Date(date);
+    do {
+      next.setDate(next.getDate() + 1);
+    } while (result[formatDateKey(next.getFullYear(), next.getMonth() + 1, next.getDate())]);
+    if (next.getFullYear() === year) {
+      result[formatDateKey(year, next.getMonth() + 1, next.getDate())] = "振替休日";
+    }
   });
 
-  for (let d = 2; d <= 30; d++) {
-    const prev = dateKey(year, 9, d - 1);
-    const cur = dateKey(year, 9, d);
-    const next = dateKey(year, 9, d + 1);
-    if (result[prev] && !result[cur] && result[next]) result[cur] = '国民の休日';
+  // 国民の休日：前後を祝日に挟まれた平日（9月に発生しうる）
+  for (let day = 2; day <= 30; day++) {
+    const prevKey = formatDateKey(year, 9, day - 1);
+    const curKey  = formatDateKey(year, 9, day);
+    const nextKey = formatDateKey(year, 9, day + 1);
+    if (result[prevKey] && !result[curKey] && result[nextKey]) {
+      result[curKey] = "国民の休日";
+    }
   }
 
+  calculatedHolidayCache[year] = result;
   return result;
 }
 
-function holidayName(key) {
-  if (HOLIDAYS[key]) return HOLIDAYS[key];
-  return getYearHolidays(Number(key.slice(0, 4)))[key] || '';
+/** 指定した日付キー("YYYY-MM-DD")の祝日名を返す。祝日でなければ空文字 */
+function holidayName(dateKeyStr) {
+  if (FIXED_HOLIDAYS[dateKeyStr]) return FIXED_HOLIDAYS[dateKeyStr];
+  const year = Number(dateKeyStr.slice(0, 4));
+  return calculateYearHolidays(year)[dateKeyStr] || "";
 }
 
-/* ── 月移動 ── */
-function changeMonth(dir) {
-  let y = curYear, m = curMonth;
-  m += dir;
-  if (m > 12) { m = 1;  y++; }
-  if (m < 1)  { m = 12; y--; }
-  // 消去済みの境界より前には戻れない
-  if (earliestYM && monthKey(y, m) < earliestYM) return;
-  curYear = y; curMonth = m;
-  render();
+
+/* ================================================================
+   3. 状態管理（グローバル変数）
+================================================================ */
+const MONTH_NAMES = ["","1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
+const DAY_NAMES   = ["日","月","火","水","木","金","土"];
+const MAX_MEMO_DISPLAY = 3; // セル内に表示するメモの最大件数（超えた分は「他◯件」）
+
+const todayDate = new Date();
+
+let currentYear  = todayDate.getFullYear();  // 現在表示中の年
+let currentMonth = todayDate.getMonth() + 1; // 現在表示中の月（1〜12）
+let editingDateKey = null;                   // メモ編集モーダルで編集中の日付キー
+let isLocked = true;                         // true=ロックモード（誤タップ防止）／false=編集モード
+
+/* カレンダーの本体データ。
+   形式： { "YYYY-MM-DD": { rest: bool, early: bool, memos: [{time, text}, ...] } }
+   ※ 既存のLocalStorageデータ（キー名 "calData"）とそのまま互換性を保つ */
+let calendarData = loadJSON("calData", {});
+
+/* 「これより前の月は消去済みで遡れない」という境界値 "YYYY-MM"（無ければnull）
+   ※ 既存のLocalStorageキー名 "calEarliest" とそのまま互換性を保つ */
+let earliestAvailableMonth = localStorage.getItem("calEarliest") || null;
+
+
+/* ================================================================
+   4. 日付ユーティリティ
+================================================================ */
+function pad2(n) { return String(n).padStart(2, "0"); }
+
+/** "YYYY-MM-DD" 形式の日付キーを作る */
+function formatDateKey(year, month, day) {
+  return `${year}-${pad2(month)}-${pad2(day)}`;
 }
 
-/* ── 古い月を消去（前月だけ残してそれより古いデータを削除） ── */
-function deleteOldMonths() {
-  // 実際の今月・前月を基準にする（表示中の月ではなく）
-  const realY = todayDate.getFullYear(), realM = todayDate.getMonth() + 1;
-  let prevY = realY, prevM = realM - 1;
-  if (prevM < 1) { prevM = 12; prevY--; }
-  const prevPrefix = `${prevY}-${String(prevM).padStart(2,'0')}`;
-  const curPrefix  = `${realY}-${String(realM).padStart(2,'0')}`;
+/** "YYYY-MM" 形式の月キーを作る */
+function formatMonthKey(year, month) {
+  return `${year}-${pad2(month)}`;
+}
 
-  // 消す対象のキーを探す（今月・前月より古いもの）
-  const toDelete = Object.keys(data).filter(k => {
-    const ym = k.slice(0, 7); // "YYYY-MM"
-    return ym !== prevPrefix && ym !== curPrefix && ym < prevPrefix;
+/** 指定した年月の日数を返す */
+function daysInMonth(year, month) {
+  return new Date(year, month, 0).getDate();
+}
+
+/** 指定した年月の1日が何曜日か（0=日〜6=土）を返す */
+function firstWeekdayOfMonth(year, month) {
+  return new Date(year, month - 1, 1).getDay();
+}
+
+/** 指定した年月がカレンダー上で何週間ぶんになるかを返す（4〜6週） */
+function weeksInMonth(year, month) {
+  return Math.ceil((firstWeekdayOfMonth(year, month) + daysInMonth(year, month)) / 7);
+}
+
+function isSameDate(year, month, day, date) {
+  return year === date.getFullYear() && month === date.getMonth() + 1 && day === date.getDate();
+}
+
+
+/* ================================================================
+   5. データの保存・読込（localStorage）
+================================================================ */
+function loadJSON(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (err) {
+    // 壊れたデータが入っていた場合も、アプリ自体は必ず起動できるようにする
+    console.error("読み込みに失敗しました:", key, err);
+    return fallback;
+  }
+}
+
+function saveCalendarData() {
+  localStorage.setItem("calData", JSON.stringify(calendarData));
+}
+
+function saveEarliestAvailableMonth() {
+  if (earliestAvailableMonth) {
+    localStorage.setItem("calEarliest", earliestAvailableMonth);
+  } else {
+    localStorage.removeItem("calEarliest");
+  }
+}
+
+/** その日のデータを取得する（無ければ空オブジェクト） */
+function getEntry(dateKeyStr) {
+  return calendarData[dateKeyStr] || {};
+}
+
+/** その日のデータを保存する。休日でも早番でもメモも無ければキー自体を削除して掃除する */
+function setEntry(dateKeyStr, entry) {
+  const hasContent = entry.rest || entry.early || (entry.memos && entry.memos.length > 0);
+  if (hasContent) {
+    calendarData[dateKeyStr] = entry;
+  } else {
+    delete calendarData[dateKeyStr];
+  }
+  saveCalendarData();
+}
+
+
+/* ================================================================
+   6. カレンダー描画
+================================================================ */
+function render() {
+  renderHeader();
+  renderDayNames();
+  renderDaysGrid();
+  renderInfoBar();
+}
+
+/** 上部バーの月タイトル表示を更新する */
+function renderHeader() {
+  const titleEl = document.getElementById("monthTitle");
+  titleEl.textContent = `${currentYear}年${MONTH_NAMES[currentMonth]}`;
+  const isCurrentMonth = isSameDate(currentYear, currentMonth, todayDate.getDate(), todayDate)
+    || (currentYear === todayDate.getFullYear() && currentMonth === todayDate.getMonth() + 1);
+  titleEl.classList.toggle("current", isCurrentMonth);
+}
+
+/** 曜日見出し行（日〜土）を描画する */
+function renderDayNames() {
+  const row = document.getElementById("dayNames");
+  row.innerHTML = "";
+  DAY_NAMES.forEach((name, i) => {
+    const cell = document.createElement("div");
+    cell.className = "day-name" + (i === 0 ? " sun" : i === 6 ? " sat" : "");
+    cell.textContent = name;
+    row.appendChild(cell);
   });
-
-  if (toDelete.length === 0) {
-    alert('消去する古い予定はありません。');
-    return;
-  }
-  if (!confirm(`今月と前月より前の予定を ${toDelete.length} 件消去します。\n本当に消去しますか？`)) return;
-
-  toDelete.forEach(k => delete data[k]);
-  // 遡れる境界を前月に設定
-  earliestYM = prevPrefix;
-  save();
-  saveEarliest();
-  // 表示中の月が消去範囲に入っていたら前月へ移動
-  if (monthKey(curYear, curMonth) < earliestYM) {
-    curYear = prevY; curMonth = prevM;
-  }
-  render();
 }
 
-/* ── メモモーダル ── */
-function openModal(y, m, d) {
-  currentKey = dateKey(y, m, d);
-  const entry = data[currentKey] || {};
-  const wday  = new Date(y, m - 1, d).getDay();
-  const hname = holidayName(currentKey) ? `（${holidayName(currentKey)}）` : '';
-  document.getElementById('modalTitle').textContent =
-    `${y}年${MONTH_NAMES[m]}${d}日（${DAY_NAMES[wday]}）${hname}`;
-  document.getElementById('chkRest').checked = !!entry.rest;
-  document.getElementById('chkEarly').checked = !!entry.early;
+/** 日付グリッド本体を描画する。週数に応じて行の高さを均等割りにする */
+function renderDaysGrid() {
+  const grid = document.getElementById("daysGrid");
+  grid.innerHTML = "";
 
-  const container = document.getElementById('memoEntries');
-  container.innerHTML = '';
+  const numDays   = daysInMonth(currentYear, currentMonth);
+  const firstWday = firstWeekdayOfMonth(currentYear, currentMonth);
+  const numWeeks  = weeksInMonth(currentYear, currentMonth);
+
+  // ここが「行の高さを全週そろえる」ための肝：
+  // その月の週数ぶんだけ repeat(N, 1fr) を明示的に指定することで、
+  // 4週の月・5週の月・6週の月のいずれでも、全ての行が同じ高さになり、
+  // かつグリッド全体がちょうど親要素の高さ(残り画面全部)に収まる。
+  grid.style.gridTemplateRows = `repeat(${numWeeks}, 1fr)`;
+
+  // 月初より前の空白マス
+  for (let i = 0; i < firstWday; i++) {
+    const empty = document.createElement("div");
+    empty.className = "day empty";
+    grid.appendChild(empty);
+  }
+
+  // 実際の日付マス
+  for (let day = 1; day <= numDays; day++) {
+    grid.appendChild(createDayCell(day, firstWday));
+  }
+
+  // 月末より後の空白マス（最終週のマス数を7の倍数に揃える）
+  const totalCells = firstWday + numDays;
+  const trailingEmpty = (numWeeks * 7) - totalCells;
+  for (let i = 0; i < trailingEmpty; i++) {
+    const empty = document.createElement("div");
+    empty.className = "day empty";
+    grid.appendChild(empty);
+  }
+}
+
+/** 1日ぶんの日付セルDOMを作る */
+function createDayCell(day, firstWday) {
+  const dateKeyStr = formatDateKey(currentYear, currentMonth, day);
+  const entry = getEntry(dateKeyStr);
   const memos = entry.memos || [];
-  if (memos.length === 0) {
-    addMemoRow();
-  } else {
-    memos.forEach(memo => addMemoRow(memo.time, memo.text));
+  const weekdayCol = (firstWday + day - 1) % 7; // 0=日, 6=土
+  const isSunday = weekdayCol === 0;
+  const isSaturday = weekdayCol === 6;
+  const holidayLabel = holidayName(dateKeyStr);
+  const isHoliday = !!holidayLabel;
+  const isToday = isSameDate(currentYear, currentMonth, day, todayDate);
+
+  const cell = document.createElement("div");
+  cell.className = buildDayCellClassName(entry, isHoliday, isSunday, isSaturday, isToday);
+
+  // 日付数字 + 休日/早番バッジ
+  const top = document.createElement("div");
+  top.className = "day-top";
+  const numEl = document.createElement("span");
+  numEl.className = "day-num";
+  numEl.textContent = day;
+  top.appendChild(numEl);
+  if (entry.rest) {
+    top.appendChild(createBadge("rest", "休"));
+  } else if (entry.early) {
+    top.appendChild(createBadge("early", "早"));
   }
-  document.getElementById('overlay').classList.add('show');
-}
+  cell.appendChild(top);
 
-function addMemoRow(time = '', text = '') {
-  const container = document.getElementById('memoEntries');
-  const row = document.createElement('div');
-  row.className = 'memo-entry';
-  row.innerHTML = `
-    <input type="time" value="${time}" placeholder="時間">
-    <input type="text" value="${text}" placeholder="内容を入力…" maxlength="20">
-    <button class="del-memo-btn" onclick="this.parentElement.remove()" title="削除">×</button>
-  `;
-  container.appendChild(row);
-  row.querySelector('input[type="text"]').focus();
-}
-
-setTimeout(() => {
-  const cr = document.getElementById('chkRest');
-  const ce = document.getElementById('chkEarly');
-  if (cr && ce) {
-    cr.addEventListener('change', () => { if (cr.checked) ce.checked = false; });
-    ce.addEventListener('change', () => { if (ce.checked) cr.checked = false; });
+  // メモ一覧（最大 MAX_MEMO_DISPLAY 件まで表示、残りは「他◯件」）
+  if (memos.length > 0) {
+    cell.appendChild(createMemoList(memos));
   }
-}, 0);
 
-function closeModal() {
-  document.getElementById('overlay').classList.remove('show');
-  currentKey = null;
+  // メモも休日設定も無い祝日は、長押し/ホバーで祝日名がわかるようにtitle属性を付ける
+  if (isHoliday && !entry.rest && memos.length === 0) {
+    cell.title = holidayLabel;
+  }
+
+  attachDayCellTapHandler(cell, day);
+  return cell;
 }
 
-function saveModal() {
-  if (!currentKey) return;
-  const rest  = document.getElementById('chkRest').checked;
-  const early = !rest && document.getElementById('chkEarly').checked;
-  const rows  = document.querySelectorAll('#memoEntries .memo-entry');
-  const memos = [];
-  rows.forEach(row => {
-    const t = row.querySelector('input[type="time"]').value.trim();
-    const x = row.querySelector('input[type="text"]').value.trim();
-    if (x) memos.push({ time: t, text: x });
+function buildDayCellClassName(entry, isHoliday, isSunday, isSaturday, isToday) {
+  let className = "day";
+  if (entry.rest)        className += " rest";
+  else if (entry.early)  className += " early";
+  else if (isHoliday)    className += " holiday";
+  else if (isSunday)     className += " sun";
+  else if (isSaturday)   className += " sat";
+  if (isToday) className += " today";
+  return className;
+}
+
+function createBadge(kind, label) {
+  const badge = document.createElement("span");
+  badge.className = "day-badge " + kind;
+  badge.textContent = label;
+  return badge;
+}
+
+function createMemoList(memos) {
+  const list = document.createElement("div");
+  list.className = "memo-list";
+
+  memos.slice(0, MAX_MEMO_DISPLAY).forEach((memo) => {
+    const item = document.createElement("div");
+    item.className = "memo-item";
+    if (memo.time) {
+      const timeLine = document.createElement("div");
+      timeLine.className = "memo-time";
+      timeLine.textContent = memo.time;
+      item.appendChild(timeLine);
+    }
+    const textLine = document.createElement("div");
+    textLine.className = "memo-text";
+    textLine.textContent = memo.text;
+    item.appendChild(textLine);
+    list.appendChild(item);
   });
-  if (rest || early || memos.length > 0) {
-    data[currentKey] = { rest, early, memos };
-  } else {
-    delete data[currentKey];
+
+  const hiddenCount = memos.length - MAX_MEMO_DISPLAY;
+  if (hiddenCount > 0) {
+    const more = document.createElement("div");
+    more.className = "memo-more";
+    more.textContent = `他 ${hiddenCount} 件`;
+    list.appendChild(more);
   }
-  save(); render(); closeModal();
+  return list;
 }
 
-function deleteEntry() {
-  if (!currentKey) return;
-  if (!confirm('この日の休日設定とメモを消去します。\n本当に消去しますか？')) return;
-  delete data[currentKey];
-  save(); render(); closeModal();
+/** この月の集計（休日◯日／早番◯日／メモ◯件）を下部バーに表示する */
+function renderInfoBar() {
+  const prefix = formatMonthKey(currentYear, currentMonth);
+  const keysThisMonth = Object.keys(calendarData).filter((k) => k.startsWith(prefix));
+
+  const restCount  = keysThisMonth.filter((k) => calendarData[k].rest).length;
+  const earlyCount = keysThisMonth.filter((k) => calendarData[k].early).length;
+  const memoCount  = keysThisMonth.reduce((sum, k) => sum + (calendarData[k].memos || []).length, 0);
+
+  const parts = [];
+  if (restCount)  parts.push(`休日 ${restCount} 日`);
+  if (earlyCount) parts.push(`早番 ${earlyCount} 日`);
+  if (memoCount)  parts.push(`メモ ${memoCount} 件`);
+
+  document.getElementById("infoBar").textContent =
+    parts.length ? `この月：${parts.join("　/　")}` : "";
 }
 
-/* ── お休み／早番トグル（なし → 休日 → 早番 → なし の順で切り替わる） ── */
-function toggleRest(y, m, d) {
-  const k = dateKey(y, m, d);
-  const entry = data[k] || {};
+
+/* ================================================================
+   7. 日付セルのタップ／ダブルタップ処理
+      シングルタップ：なし→休日→早番→なし の順で切替
+      ダブルタップ  ：メモ編集モーダルを開く
+      ※ タイマーによる自前判定（300ms以内の2回目のタップをダブルタップ扱い）
+================================================================ */
+const DOUBLE_TAP_THRESHOLD_MS = 300;
+
+function attachDayCellTapHandler(cell, day) {
+  cell.addEventListener("click", () => {
+    if (isLocked) return; // ロック中は誤操作防止のため一切反応しない
+
+    const now = Date.now();
+    const lastTap = Number(cell.dataset.lastTap || 0);
+
+    if (now - lastTap < DOUBLE_TAP_THRESHOLD_MS) {
+      // 2回目のタップ＝ダブルタップとしてメモ編集を開く
+      cell.dataset.lastTap = "0";
+      openMemoModal(currentYear, currentMonth, day);
+    } else {
+      // 1回目のタップ。既定時間内に2回目が来なければシングルタップとして処理する
+      cell.dataset.lastTap = String(now);
+      setTimeout(() => {
+        if (Number(cell.dataset.lastTap) === now) {
+          cycleRestEarlyStatus(currentYear, currentMonth, day);
+        }
+      }, DOUBLE_TAP_THRESHOLD_MS);
+    }
+  });
+}
+
+/** シングルタップ時の状態遷移：なし → 休日 → 早番 → なし */
+function cycleRestEarlyStatus(year, month, day) {
+  const dateKeyStr = formatDateKey(year, month, day);
+  const entry = getEntry(dateKeyStr);
+
   let rest = false, early = false;
   if (!entry.rest && !entry.early) {
-    rest = true;
+    rest = true;             // なし → 休日
   } else if (entry.rest) {
-    early = true;
-  } // entry.early の場合は rest=false, early=false のまま（＝なし）
-
-  if (rest || early || (entry.memos && entry.memos.length > 0)) {
-    data[k] = { ...entry, rest, early };
-  } else {
-    delete data[k];
+    early = true;            // 休日 → 早番
   }
-  save(); render();
-}
+  // entry.early だった場合は rest=false, early=false のまま（＝早番 → なし）
 
-/* ── 描画 ── */
-function render() {
-  const y = curYear, m = curMonth;
-  const titleEl = document.getElementById('monthTitle');
-  titleEl.textContent = `${y}年${MONTH_NAMES[m]}`;
-  const isCurrentMonth = (y === todayDate.getFullYear() && m === todayDate.getMonth() + 1);
-  titleEl.className = 'month-title' + (isCurrentMonth ? ' current' : '');
-
-  
-
-  // 曜日ヘッダー
-  const dnRow = document.getElementById('dayNames');
-  dnRow.innerHTML = '';
-  DAY_NAMES.forEach((n, i) => {
-    const c = document.createElement('div');
-    c.className = 'day-name ' + (i === 0 ? 'sun' : i === 6 ? 'sat' : 'wkd');
-    c.textContent = n;
-    dnRow.appendChild(c);
-  });
-
-  // 日付グリッド
-  const grid    = document.getElementById('daysGrid');
-  grid.innerHTML = '';
-  const numDays  = new Date(y, m, 0).getDate();
-  const firstDay = new Date(y, m - 1, 1).getDay();
-
-  for (let i = 0; i < firstDay; i++) {
-    const e = document.createElement('div');
-    e.className = 'day empty';
-    grid.appendChild(e);
-  }
-
-  for (let d = 1; d <= numDays; d++) {
-    const k     = dateKey(y, m, d);
-    const entry = data[k] || {};
-    const memos = entry.memos || [];
-    const col   = (firstDay + d - 1) % 7;
-    const hname = holidayName(k);
-    const isH   = !!hname;
-    const isSu  = col === 0;
-    const isSa  = col === 6;
-    const isToday = (y === todayDate.getFullYear() && m === todayDate.getMonth() + 1 && d === todayDate.getDate());
-
-    const cell = document.createElement('div');
-    let cls = 'day';
-    if      (entry.rest)  cls += ' rest';
-    else if (entry.early) cls += ' early';
-    else if (isH)         cls += ' holiday';
-    else if (isSu)        cls += ' sun';
-    else if (isSa)        cls += ' sat';
-    if (isToday)         cls += ' today';
-    cell.className = cls;
-
-    // 日付 + 休バッジ
-    const top = document.createElement('div');
-    top.className = 'day-top';
-    const num = document.createElement('span');
-    num.className = 'day-num';
-    num.textContent = d;
-    top.appendChild(num);
-    if (entry.rest) {
-      const badge = document.createElement('span');
-      badge.className = 'rest-badge';
-      badge.textContent = '休';
-      top.appendChild(badge);
-    } else if (entry.early) {
-      const badge = document.createElement('span');
-      badge.className = 'early-badge';
-      badge.textContent = '早';
-      top.appendChild(badge);
-    }
-    cell.appendChild(top);
-
-    // メモ表示
-    if (memos.length > 0) {
-      const list = document.createElement('div');
-      list.className = 'memo-list';
-      memos.slice(0, MAX_DISPLAY).forEach(memo => {
-        const item = document.createElement('div');
-        item.className = 'memo-item';
-        if (memo.time) {
-          const tLine = document.createElement('div');
-          tLine.className = 'memo-time';
-          tLine.textContent = memo.time;
-          item.appendChild(tLine);
-        }
-        const xLine = document.createElement('div');
-        xLine.className = 'memo-text';
-        xLine.textContent = memo.text;
-        item.appendChild(xLine);
-        list.appendChild(item);
-      });
-      if (memos.length > MAX_DISPLAY) {
-        const more = document.createElement('div');
-        more.className = 'more-badge';
-        more.textContent = `他 ${memos.length - MAX_DISPLAY} 件`;
-        list.appendChild(more);
-      }
-      cell.appendChild(list);
-    }
-
-    if (isH && !entry.rest && memos.length === 0) cell.title = hname;
-    cell.addEventListener('click', () => {
-      if (isLocked) return;
-
-      const now = Date.now();
-      const lastTap = Number(cell.dataset.lastTap || 0);
-
-      if (now - lastTap < 300) {
-        cell.dataset.lastTap = 0;
-        openModal(y,m,d);
-      } else {
-        cell.dataset.lastTap = now;
-        setTimeout(() => {
-          if (Number(cell.dataset.lastTap) === now) {
-            toggleRest(y,m,d);
-          }
-        }, 300);
-      }
-    });
-    grid.appendChild(cell);
-  }
-
-  // インフォバー
-  const prefix = `${y}-${String(m).padStart(2,'0')}`;
-  const monthKeys = Object.keys(data).filter(k => k.startsWith(prefix));
-  const restCnt  = monthKeys.filter(k => data[k].rest).length;
-  const earlyCnt = monthKeys.filter(k => data[k].early).length;
-  const memoCnt  = monthKeys.reduce((sum, k) => sum + (data[k].memos || []).length, 0);
-  let info = [];
-  if (restCnt)  info.push(`休日 ${restCnt} 日`);
-  if (earlyCnt) info.push(`早番 ${earlyCnt} 日`);
-  if (memoCnt)  info.push(`メモ ${memoCnt} 件`);
-  document.getElementById('infoBar').textContent =
-    info.length ? `この月：${info.join('　/')}　設定中` : '';
-
-}
-
-/* ── リセット（表示中の月だけ） ── */
-function resetAll() {
-  const prefix = monthKey(curYear, curMonth);
-  const monthItems = Object.keys(data).filter(k => k.startsWith(prefix));
-  if (monthItems.length === 0) {
-    alert('この月には消す予定がありません。');
-    return;
-  }
-  if (!confirm(`${curYear}年${MONTH_NAMES[curMonth]}の休日設定とメモをすべて消去します。\n本当にリセットしますか？`)) return;
-  monthItems.forEach(k => delete data[k]);
-  save(); render();
-}
-
-/* キーボード */
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeModal();
-});
-
-
-/* ===== FINAL CUSTOM ===== */
-function goToday() {
-  curYear  = todayDate.getFullYear();
-  curMonth = todayDate.getMonth() + 1;
+  setEntry(dateKeyStr, { ...entry, rest, early });
   render();
 }
 
-function updateTopButtons(){
- const l=document.getElementById('lockBtn');
- const e=document.getElementById('editBtn');
- if(isLocked){
-   l.classList.add('active-rest');
-   l.textContent='🔒 ロック';
-   e.classList.remove('active-edit');
-   e.textContent='✏️ 編集';
-   document.body.classList.remove('editing');
- }else{
-   e.classList.add('active-edit');
-   e.textContent='✏️ 編集中';
-   l.classList.remove('active-rest');
-   l.textContent='🔒 ロック';
-   document.body.classList.add('editing');
- }
+
+/* ================================================================
+   8. メモ編集モーダル
+================================================================ */
+function openMemoModal(year, month, day) {
+  editingDateKey = formatDateKey(year, month, day);
+  const entry = getEntry(editingDateKey);
+  const weekday = new Date(year, month - 1, day).getDay();
+  const holidayLabel = holidayName(editingDateKey);
+
+  document.getElementById("modalTitle").textContent =
+    `${year}年${MONTH_NAMES[month]}${day}日（${DAY_NAMES[weekday]}）` + (holidayLabel ? `（${holidayLabel}）` : "");
+
+  setModalToggleState("chkRest", "restToggleLabel", !!entry.rest);
+  setModalToggleState("chkEarly", "earlyToggleLabel", !!entry.early);
+
+  const container = document.getElementById("memoEntries");
+  container.innerHTML = "";
+  const memos = entry.memos || [];
+  if (memos.length === 0) {
+    addMemoRow(); // 何も無い場合は空の入力欄を1行だけ出しておく
+  } else {
+    memos.forEach((memo) => addMemoRow(memo.time, memo.text));
+  }
+
+  document.getElementById("modalOverlay").classList.add("show");
 }
 
-setTimeout(()=>{
- const l=document.getElementById('lockBtn');
- const e=document.getElementById('editBtn');
- if(l) l.onclick=()=>{isLocked=true;updateTopButtons();};
- if(e) e.onclick=()=>{isLocked=false;updateTopButtons();};
- updateTopButtons();
-},100);
+function closeMemoModal() {
+  document.getElementById("modalOverlay").classList.remove("show");
+  editingDateKey = null;
+}
 
-/* swipe */
-let sx=0, sy=0;
-document.addEventListener('touchstart',e=>{
- sx=e.touches[0].clientX;
- sy=e.touches[0].clientY;
-},{passive:true});
+function setModalToggleState(inputId, labelId, checked) {
+  const input = document.getElementById(inputId);
+  const label = document.getElementById(labelId);
+  input.checked = checked;
+  label.classList.toggle("checked", checked);
+}
 
-document.addEventListener('touchend',e=>{
- const dx=e.changedTouches[0].clientX-sx;
- const dy=e.changedTouches[0].clientY-sy;
- if(Math.abs(dx)>80 && Math.abs(dx)>Math.abs(dy)){
-   changeMonth(dx<0?1:-1);
- }
-},{passive:true});
+/** メモ入力欄を1行追加する */
+function addMemoRow(time = "", text = "") {
+  const container = document.getElementById("memoEntries");
+  const row = document.createElement("div");
+  row.className = "memo-entry";
 
-/* mac trackpad */
-let wheelBusy=false;
-document.addEventListener('wheel',e=>{
- if(wheelBusy || Math.abs(e.deltaX)<40) return;
- wheelBusy=true;
- changeMonth(e.deltaX>0?1:-1);
- setTimeout(()=>wheelBusy=false,400);
-},{passive:true});
+  const timeInput = document.createElement("input");
+  timeInput.type = "time";
+  timeInput.value = time;
 
-render();
+  const textInput = document.createElement("input");
+  textInput.type = "text";
+  textInput.value = text;
+  textInput.placeholder = "内容を入力…";
+  textInput.maxLength = 20;
+
+  const delBtn = document.createElement("button");
+  delBtn.type = "button";
+  delBtn.className = "memo-del-btn";
+  delBtn.textContent = "×";
+  delBtn.title = "この行を削除";
+  delBtn.addEventListener("click", () => row.remove());
+
+  row.appendChild(timeInput);
+  row.appendChild(textInput);
+  row.appendChild(delBtn);
+  container.appendChild(row);
+  textInput.focus();
+}
+
+/** モーダルの保存ボタン：チェック状態と入力済みメモを読み取って保存する */
+function saveMemoModal() {
+  if (!editingDateKey) return;
+
+  const rest  = document.getElementById("chkRest").checked;
+  const early = !rest && document.getElementById("chkEarly").checked; // 休日と早番は同時に成立しない
+
+  const memos = [];
+  document.querySelectorAll("#memoEntries .memo-entry").forEach((row) => {
+    const time = row.querySelector('input[type="time"]').value.trim();
+    const text = row.querySelector('input[type="text"]').value.trim();
+    if (text) memos.push({ time, text }); // 内容が空の行は保存しない
+  });
+
+  setEntry(editingDateKey, { rest, early, memos });
+  render();
+  closeMemoModal();
+}
+
+/** 「この日の設定をすべて削除」ボタン */
+function deleteMemoEntry() {
+  if (!editingDateKey) return;
+  if (!confirm("この日の休日設定とメモを消去します。\n本当に消去しますか？")) return;
+  delete calendarData[editingDateKey];
+  saveCalendarData();
+  render();
+  closeMemoModal();
+}
+
+
+/* ================================================================
+   9. 月移動・今日へ戻る・古い月の消去・月のリセット
+================================================================ */
+function navigateMonth(direction) {
+  let year = currentYear, month = currentMonth + direction;
+  if (month > 12) { month = 1;  year++; }
+  if (month < 1)  { month = 12; year--; }
+
+  // 消去済みの境界より前の月には戻れない
+  if (earliestAvailableMonth && formatMonthKey(year, month) < earliestAvailableMonth) return;
+
+  currentYear = year;
+  currentMonth = month;
+  render();
+}
+
+function goToCurrentMonth() {
+  currentYear  = todayDate.getFullYear();
+  currentMonth = todayDate.getMonth() + 1;
+  render();
+}
+
+/** 「今月・先月」より古いデータをまとめて消去する（表示中の月ではなく実際の今日基準） */
+function deleteOldMonths() {
+  const realYear = todayDate.getFullYear();
+  const realMonth = todayDate.getMonth() + 1;
+  let prevYear = realYear, prevMonth = realMonth - 1;
+  if (prevMonth < 1) { prevMonth = 12; prevYear--; }
+
+  const currentPrefix  = formatMonthKey(realYear, realMonth);
+  const previousPrefix = formatMonthKey(prevYear, prevMonth);
+
+  const keysToDelete = Object.keys(calendarData).filter((key) => {
+    const monthPrefix = key.slice(0, 7); // "YYYY-MM" 部分
+    return monthPrefix !== currentPrefix && monthPrefix !== previousPrefix && monthPrefix < previousPrefix;
+  });
+
+  if (keysToDelete.length === 0) {
+    alert("消去する古い予定はありません。");
+    return;
+  }
+  if (!confirm(`今月と先月より前の予定を ${keysToDelete.length} 件消去します。\n本当に消去しますか？`)) return;
+
+  keysToDelete.forEach((key) => delete calendarData[key]);
+  earliestAvailableMonth = previousPrefix;
+  saveCalendarData();
+  saveEarliestAvailableMonth();
+
+  // 表示中の月が消去範囲に入っていた場合は先月へ移動する
+  if (formatMonthKey(currentYear, currentMonth) < earliestAvailableMonth) {
+    currentYear = prevYear;
+    currentMonth = prevMonth;
+  }
+  render();
+}
+
+/** 表示中の月だけ、休日設定とメモをまとめて消去する */
+function resetCurrentMonth() {
+  const prefix = formatMonthKey(currentYear, currentMonth);
+  const keysThisMonth = Object.keys(calendarData).filter((key) => key.startsWith(prefix));
+
+  if (keysThisMonth.length === 0) {
+    alert("この月には消す予定がありません。");
+    return;
+  }
+  if (!confirm(`${currentYear}年${MONTH_NAMES[currentMonth]}の休日設定とメモをすべて消去します。\n本当にリセットしますか？`)) return;
+
+  keysThisMonth.forEach((key) => delete calendarData[key]);
+  saveCalendarData();
+  render();
+}
+
+
+/* ================================================================
+   10. ロック／編集モードの切替
+================================================================ */
+function setLockedMode(locked) {
+  isLocked = locked;
+  document.body.classList.toggle("locked", locked);
+  document.body.classList.toggle("editing", !locked);
+
+  document.getElementById("lockModeBtn").classList.toggle("active", locked);
+  document.getElementById("editModeBtn").classList.toggle("active", !locked);
+}
+
+
+/* ================================================================
+   11. スワイプ・トラックパッド・キーボード操作
+================================================================ */
+function isAnyModalOpen() {
+  return document.getElementById("modalOverlay").classList.contains("show")
+      || document.getElementById("helpOverlay").classList.contains("show");
+}
+
+function setupSwipeNavigation() {
+  const SWIPE_THRESHOLD_PX = 70;
+  let startX = 0, startY = 0;
+
+  document.addEventListener("touchstart", (e) => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+
+  document.addEventListener("touchend", (e) => {
+    if (isAnyModalOpen()) return; // モーダル表示中はスワイプで月が変わらないようにする
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) > SWIPE_THRESHOLD_PX && Math.abs(dx) > Math.abs(dy)) {
+      navigateMonth(dx < 0 ? 1 : -1);
+    }
+  }, { passive: true });
+}
+
+/** Macのトラックパッド等での横スクロール（deltaX）でも月を送れるようにする */
+function setupTrackpadNavigation() {
+  let wheelBusy = false;
+  document.addEventListener("wheel", (e) => {
+    if (wheelBusy || isAnyModalOpen() || Math.abs(e.deltaX) < 40) return;
+    wheelBusy = true;
+    navigateMonth(e.deltaX > 0 ? 1 : -1);
+    setTimeout(() => { wheelBusy = false; }, 400);
+  }, { passive: true });
+}
+
+function setupKeyboardShortcuts() {
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      closeMemoModal();
+      document.getElementById("helpOverlay").classList.remove("show");
+    }
+  });
+}
+
+
+/* ================================================================
+   12. 初期化：ボタンにイベントを割り当てて最初の描画を行う
+================================================================ */
+function initEventListeners() {
+  document.getElementById("prevBtn").addEventListener("click", () => navigateMonth(-1));
+  document.getElementById("nextBtn").addEventListener("click", () => navigateMonth(1));
+  document.getElementById("todayBtn").addEventListener("click", goToCurrentMonth);
+
+  document.getElementById("lockModeBtn").addEventListener("click", () => setLockedMode(true));
+  document.getElementById("editModeBtn").addEventListener("click", () => setLockedMode(false));
+
+  document.getElementById("deleteOldBtn").addEventListener("click", deleteOldMonths);
+  document.getElementById("resetMonthBtn").addEventListener("click", resetCurrentMonth);
+
+  // メモ編集モーダル
+  document.getElementById("addMemoBtn").addEventListener("click", () => addMemoRow());
+  document.getElementById("modalSaveBtn").addEventListener("click", saveMemoModal);
+  document.getElementById("modalCancelBtn").addEventListener("click", closeMemoModal);
+  document.getElementById("modalDeleteBtn").addEventListener("click", deleteMemoEntry);
+  document.getElementById("modalOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "modalOverlay") closeMemoModal(); // 背景タップで閉じる
+  });
+  document.getElementById("chkRest").addEventListener("change", (e) => {
+    if (e.target.checked) setModalToggleState("chkEarly", "earlyToggleLabel", false);
+    setModalToggleState("chkRest", "restToggleLabel", e.target.checked);
+  });
+  document.getElementById("chkEarly").addEventListener("change", (e) => {
+    if (e.target.checked) setModalToggleState("chkRest", "restToggleLabel", false);
+    setModalToggleState("chkEarly", "earlyToggleLabel", e.target.checked);
+  });
+
+  // ヘルプモーダル
+  document.getElementById("helpBtn").addEventListener("click", () => {
+    document.getElementById("helpOverlay").classList.add("show");
+  });
+  document.getElementById("helpCloseBtn").addEventListener("click", () => {
+    document.getElementById("helpOverlay").classList.remove("show");
+  });
+  document.getElementById("helpOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "helpOverlay") e.currentTarget.classList.remove("show");
+  });
+}
+
+function init() {
+  initEventListeners();
+  setupSwipeNavigation();
+  setupTrackpadNavigation();
+  setupKeyboardShortcuts();
+  setLockedMode(true); // 起動時は常にロックモード（誤タップ防止）
+  render();
+}
+
+init();
 </script>
 </body>
 </html>
