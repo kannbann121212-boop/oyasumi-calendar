@@ -42,8 +42,8 @@
   --color-sunday:        #ff3b30; /* 日曜・祝日の文字色 */
   --color-saturday:      #007aff; /* 土曜の文字色 */
   --color-today:         #ff3b30; /* 今日の丸印 */
-  --color-rest:          #007aff; /* 休日（休）のテーマカラー */
-  --color-rest-bg:       #e8f1ff; /* 休日セルの背景 */
+  --color-rest:          #34c759; /* 休日（休）のテーマカラー */
+  --color-rest-bg:       #e6f9ea; /* 休日セルの背景 */
   --color-early:         #ff9500; /* 早番（早）のテーマカラー */
   --color-early-bg:      #fff3e0; /* 早番セルの背景 */
   --color-memo-time:     #007aff; /* メモの時間文字（青） */
@@ -53,7 +53,7 @@
   /* 画面の縦横小さい方(vmin)を基準に文字サイズを決める。
      こうすることで iPhone / iPad / PC のどの画面比率でも
      UI全体が破綻せず一定の比率で拡大縮小する。 */
-  --base-font: clamp(13px, 2.05vmin, 19px);
+  --base-font: clamp(15px, 2.4vmin, 22px);
 }
 
 /* ---- リセット ---- */
@@ -306,7 +306,7 @@ body:not(.locked) .day:not(.empty):active{ filter:brightness(0.94); }
 }
 .memo-item{ line-height:1.25; overflow:hidden; }
 .memo-time{
-  font-size:0.62rem;
+  font-size:0.72rem;
   font-weight:700;
   color:var(--color-memo-time);   /* 時間は青文字 */
   white-space:nowrap;
@@ -314,14 +314,14 @@ body:not(.locked) .day:not(.empty):active{ filter:brightness(0.94); }
   text-overflow:ellipsis;
 }
 .memo-text{
-  font-size:0.62rem;
+  font-size:0.72rem;
   color:var(--color-memo-text);   /* 内容は黒文字 */
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
 }
 .memo-more{
-  font-size:0.58rem;
+  font-size:0.65rem;
   color:var(--color-text-sub);
 }
 
