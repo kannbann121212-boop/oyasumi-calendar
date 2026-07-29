@@ -53,7 +53,7 @@
   /* 画面の縦横小さい方(vmin)を基準に文字サイズを決める。
      こうすることで iPhone / iPad / PC のどの画面比率でも
      UI全体が破綻せず一定の比率で拡大縮小する。 */
-  --base-font: clamp(19px, 3vmin, 26px);
+  --base-font: clamp(21px, 3.3vmin, 28px);
 }
 
 /* ---- リセット ---- */
@@ -206,7 +206,7 @@ body.editing .header{ color:var(--color-accent); }
 }
 .day-name{
   text-align:center;
-  padding:0.45rem 0.1rem;
+  padding:0.3rem 0.1rem;
   font-size:0.72rem;
   font-weight:700;
   color:var(--color-text-sub);
@@ -235,7 +235,7 @@ body.editing .header{ color:var(--color-accent); }
   flex-direction:column;
   min-width:0;
   min-height:0;                 /* 高さはgridの1frが決める。ここでmin-heightは指定しない */
-  padding:0.2rem 0.25rem;
+  padding:0.12rem 0.2rem;
   overflow:hidden;
   cursor:pointer;
   user-select:none;
@@ -261,9 +261,9 @@ body:not(.locked) .day:not(.empty):active{ filter:brightness(0.94); }
 .day-num{
   font-size:0.85rem;
   font-weight:600;
-  line-height:1.7;
-  width:1.7em;
-  height:1.7em;
+  line-height:1.4;
+  width:1.4em;
+  height:1.4em;
   display:flex;
   align-items:center;
   justify-content:center;
@@ -304,7 +304,7 @@ body:not(.locked) .day:not(.empty):active{ filter:brightness(0.94); }
   overflow:hidden;
   margin-top:0.1rem;
 }
-.memo-item{ line-height:1.25; overflow:hidden; }
+.memo-item{ line-height:1.1; overflow:hidden; }
 .memo-time{
   font-size:0.72rem;
   font-weight:700;
