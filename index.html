@@ -256,8 +256,9 @@ body.editing .header{ color:var(--color-accent); }
 .day.sun{ background:#fff2f1; }
 .day.sat{ background:#eef6ff; }
 .day.holiday{ background:#fff2f1; }
-.day.rest{ background:var(--color-card); }
-.day.early{ background:var(--color-card); }
+/* 休み・早番は基本は白背景（.day のデフォルト）。
+   ただし土日祝と重なった場合は、上の .day.sun / .day.sat / .day.holiday の
+   背景色をそのまま優先させたいので、ここでは背景を上書きしない。 */
 body.locked .day:not(.empty):active{ filter:none; }
 body:not(.locked) .day:not(.empty):active{ filter:brightness(0.94); }
 
@@ -939,11 +940,11 @@ function createDayCell(day, firstWday) {
 
 function buildDayCellClassName(entry, isHoliday, isSunday, isSaturday, isToday) {
   let className = "day";
-  if (entry.rest)        className += " rest";
-  else if (entry.early)  className += " early";
-  else if (isHoliday)    className += " holiday";
+  if (isHoliday)         className += " holiday";
   else if (isSunday)     className += " sun";
   else if (isSaturday)   className += " sat";
+  if (entry.rest)        className += " rest";
+  else if (entry.early)  className += " early";
   if (isToday) className += " today";
   return className;
 }
