@@ -340,32 +340,6 @@ body:not(.locked) .day:not(.empty):active{ filter:brightness(0.94); }
 }
 
 /* ================================================================
-   下部バー（この月の集計・古い月の消去・月のリセット）
-================================================================ */
-.footer{
-  flex:0 0 auto;
-  display:flex;
-  flex-direction:column;
-  gap:0.25rem;
-}
-.footer-buttons{
-  display:flex;
-  gap:0.4rem;
-}
-.footer-btn{
-  flex:1 1 0;
-  border:none;
-  border-radius:0.7rem;
-  background:var(--color-card);
-  color:var(--color-text-sub);
-  font-size:0.72rem;
-  font-weight:600;
-  padding:0.45rem 0.3rem;
-  cursor:pointer;
-  box-shadow:0 1px 2px rgba(0,0,0,0.06);
-}
-
-/* ================================================================
    モーダル共通（メモ編集・ヘルプ）
 ================================================================ */
 .overlay{
@@ -492,13 +466,6 @@ body:not(.locked) .day:not(.empty):active{ filter:brightness(0.94); }
   <!-- ─────────────────────────────────────────
        ③ 下部バー：この月の集計・古い月の消去・リセット
   ───────────────────────────────────────── -->
-  <div class="footer">
-    <div class="footer-buttons">
-      <button class="footer-btn" id="deleteOldBtn">🗑️ 古い月を消去</button>
-      <button class="footer-btn" id="resetMonthBtn">↩️ この月をリセット</button>
-    </div>
-  </div>
-
 </div>
 
 <!-- ─────────────────────────────────────────
@@ -739,7 +706,7 @@ let calendarData = loadJSON("calData", {});
 
 /* 「これより前の月は消去済みで遡れない」という境界値 "YYYY-MM"（無ければnull）
    ※ 既存のLocalStorageキー名 "calEarliest" とそのまま互換性を保つ */
-let earliestAvailableMonth = localStorage.getItem("calEarliest") || null;
+
 
 
 /* ================================================================
@@ -795,13 +762,6 @@ function saveCalendarData() {
   localStorage.setItem("calData", JSON.stringify(calendarData));
 }
 
-function saveEarliestAvailableMonth() {
-  if (earliestAvailableMonth) {
-    localStorage.setItem("calEarliest", earliestAvailableMonth);
-  } else {
-    localStorage.removeItem("calEarliest");
-  }
-}
 
 /** その日のデータを取得する（無ければ空オブジェクト） */
 function getEntry(dateKeyStr) {
@@ -1102,7 +1062,6 @@ function navigateMonth(direction) {
   if (month < 1)  { month = 12; year--; }
 
   // 消去済みの境界より前の月には戻れない
-  if (earliestAvailableMonth && formatMonthKey(year, month) < earliestAvailableMonth) return;
 
   currentYear = year;
   currentMonth = month;
@@ -1116,55 +1075,6 @@ function goToCurrentMonth() {
 }
 
 /** 「今月・先月」より古いデータをまとめて消去する（表示中の月ではなく実際の今日基準） */
-function deleteOldMonths() {
-  const realYear = todayDate.getFullYear();
-  const realMonth = todayDate.getMonth() + 1;
-  let prevYear = realYear, prevMonth = realMonth - 1;
-  if (prevMonth < 1) { prevMonth = 12; prevYear--; }
-
-  const currentPrefix  = formatMonthKey(realYear, realMonth);
-  const previousPrefix = formatMonthKey(prevYear, prevMonth);
-
-  const keysToDelete = Object.keys(calendarData).filter((key) => {
-    const monthPrefix = key.slice(0, 7); // "YYYY-MM" 部分
-    return monthPrefix !== currentPrefix && monthPrefix !== previousPrefix && monthPrefix < previousPrefix;
-  });
-
-  if (keysToDelete.length === 0) {
-    alert("消去する古い予定はありません。");
-    return;
-  }
-  if (!confirm(`今月と先月より前の予定を ${keysToDelete.length} 件消去します。\n本当に消去しますか？`)) return;
-
-  keysToDelete.forEach((key) => delete calendarData[key]);
-  earliestAvailableMonth = previousPrefix;
-  saveCalendarData();
-  saveEarliestAvailableMonth();
-
-  // 表示中の月が消去範囲に入っていた場合は先月へ移動する
-  if (formatMonthKey(currentYear, currentMonth) < earliestAvailableMonth) {
-    currentYear = prevYear;
-    currentMonth = prevMonth;
-  }
-  render();
-}
-
-/** 表示中の月だけ、休日設定とメモをまとめて消去する */
-function resetCurrentMonth() {
-  const prefix = formatMonthKey(currentYear, currentMonth);
-  const keysThisMonth = Object.keys(calendarData).filter((key) => key.startsWith(prefix));
-
-  if (keysThisMonth.length === 0) {
-    alert("この月には消す予定がありません。");
-    return;
-  }
-  if (!confirm(`${currentYear}年${MONTH_NAMES[currentMonth]}の休日設定とメモをすべて消去します。\n本当にリセットしますか？`)) return;
-
-  keysThisMonth.forEach((key) => delete calendarData[key]);
-  saveCalendarData();
-  render();
-}
-
 
 /* ================================================================
    10. ロック／編集モードの切替
@@ -1238,8 +1148,6 @@ function initEventListeners() {
   document.getElementById("lockModeBtn").addEventListener("click", () => setLockedMode(true));
   document.getElementById("editModeBtn").addEventListener("click", () => setLockedMode(false));
 
-  document.getElementById("deleteOldBtn").addEventListener("click", deleteOldMonths);
-  document.getElementById("resetMonthBtn").addEventListener("click", resetCurrentMonth);
 
   // メモ編集モーダル
   document.getElementById("addMemoBtn").addEventListener("click", () => addMemoRow());
